@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tankopedia — Энциклопедия бронетехники</title>
+<style>
+    :root {
+        --bg-color: #f0f2f5; --card-bg: #ffffff; --text-main: #2c3e50;
+        --text-secondary: #7f8c8d; --accent: #e74c3c;
+        --header-bg: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        --nav-bg: #34495e; --modal-overlay: rgba(0,0,0,0.85);
+        --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        --card-radius: 12px; --grid-gap: 2rem; --card-min-width: 350px;
+    }
+    body.dark-mode {
+        --bg-color: #1a1a2e; --card-bg: #16213e; --text-main: #ecf0f1;
+        --text-secondary: #bdc3c7;
+        --header-bg: linear-gradient(135deg, #0f0c29 0%, #302b63 100%);
+        --nav-bg: #0f0c29; --modal-overlay: rgba(0,0,0,0.92);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font-main); background: var(--bg-color); color: var(--text-main); line-height: 1.6; min-height: 100vh; transition: background 0.3s, color 0.3s; }
+    header { background: var(--header-bg); color: white; padding: 2rem 0; text-align: center; position: relative; }
+    header h1 { font-size: 2.2rem; }
+    header p { opacity: 0.85; }
+    .settings-toggle { position: absolute; top: 1rem; right: 1rem; background: rgba(255,255,255,0.2); border: none; color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: background 0.2s, transform 0.2s; }
+    .settings-toggle:hover { background: rgba(255,255,255,0.35); transform: rotate(30deg); }
+    nav { background: var(--nav-bg); padding: 0.8rem; position: sticky; top: 0; z-index: 100; overflow-x: auto; white-space: nowrap; }
+    nav ul { list-style: none; display: flex; justify-content: center; gap: 0.5rem; padding: 0 1rem; }
+    nav a { color: white; text-decoration: none; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; opacity: 0.8; transition: opacity 0.2s, background 0.2s; display: inline-block; }
+    nav a:hover, nav a.active { opacity: 1; background: rgba(255,255,255,0.2); }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; margin-bottom: 2rem; }
+    .search-box { flex: 1 1 280px; max-width: 420px; }
+    .search-box input { padding: 0.8rem 1.5rem; border-radius: 25px; border: 2px solid transparent; background: var(--card-bg); color: var(--text-main); width: 100%; font-size: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); outline: none; transition: border-color 0.2s; }
+    .search-box input:focus { border-color: var(--accent); }
+    #filterContainer { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+    .filter-btn { background: var(--card-bg); color: var(--text-main); border: 1px solid rgba(127,127,127,0.25); padding: 0.6rem 1.2rem; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+    .filter-btn.active, .filter-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+    .results-count { text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin: -1rem 0 1.5rem; min-height: 1.2em; }
+    .tanks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min-width, 350px), 100%), 1fr)); gap: var(--grid-gap); }
+    .tank-card { background: var(--card-bg); border-radius: var(--card-radius); overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; display: flex; flex-direction: column; height: 100%; transition: transform 0.2s, box-shadow 0.2s; outline: none; }
+    .tank-card:hover, .tank-card:focus-visible { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+    .tank-image-wrapper { width: 100%; aspect-ratio: 400 / 240; background: #0f151b; overflow: hidden; flex-shrink: 0; line-height: 0; display: flex; align-items: center; justify-content: center; }
+    .tank-image-wrapper img { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .tank-info { padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column; }
+    .tank-info h3 { margin-bottom: 0.5rem; font-size: 1.2rem; min-height: 2.4em; }
+    .tags { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .tag { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 10px; color: white; font-weight: 600; }
+    .tank-desc { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.4; }
+    .tank-history { font-size: 0.85rem; color: var(--text-secondary); border-top: 1px solid rgba(127,127,127,0.2); padding-top: 0.8rem; margin-top: auto; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .specs-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 1rem; font-size: 0.85rem; }
+    .spec-item { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(127,127,127,0.12); }
+    .spec-label { color: var(--text-secondary); }
+    .spec-value { font-weight: 600; color: var(--text-main); text-align: right; }
+    .empty-state { grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: var(--text-secondary); }
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 0.5rem; }
+    .empty-state p { font-size: 1.2rem; color: var(--text-main); margin-bottom: 0.3rem; }
+    .empty-state span { font-size: 0.9rem; display: block; margin-bottom: 1.2rem; }
+    .settings-modal { display: none; position: fixed; inset: 0; background: var(--modal-overlay); z-index: 2000; justify-content: center; align-items: center; padding: 1rem; }
+    .settings-content { background: var(--card-bg); padding: 2rem; border-radius: 15px; width: 100%; max-width: 500px; position: relative; color: var(--text-main); animation: slideIn 0.25s; }
+    .setting-row { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .setting-row label { font-weight: bold; }
+    input[type="range"] { width: 150px; accent-color: var(--accent); cursor: pointer; }
+    .switch { position: relative; display: inline-block; width: 50px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(26px); }
+    .modal { display: none; position: fixed; inset: 0; background: var(--modal-overlay); z-index: 1000; overflow-y: auto; padding: 1rem; }
+    .modal-content { background: var(--card-bg); max-width: 900px; margin: 2rem auto; border-radius: 15px; overflow: hidden; position: relative; animation: slideIn 0.3s; color: var(--text-main); }
+    @keyframes slideIn { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .close-modal { position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.5); color: white; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; z-index: 10; font-size: 1.3rem; line-height: 1; transition: background 0.2s; }
+    .close-modal:hover { background: var(--accent); }
+    .modal-header { background: var(--header-bg); color: white; padding: 2rem; }
+    .modal-header h2 { font-size: 1.6rem; }
+    .modal-body { padding: 2rem; }
+    .modal-body h3 { margin: 1.5rem 0 1rem; border-bottom: 2px solid var(--accent); display: inline-block; padding-bottom: 0.2rem; }
+    .modal-body p { white-space: pre-line; margin-bottom: 1rem; }
+    .modal-hero-wrap { background: #0f151b; border-radius: 10px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 6px 25px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; min-height: 200px; }
+    .modal-hero { width: 100%; display: block; max-height: 460px; object-fit: contain; }
+    .image-credit { font-size: 0.75rem; color: var(--text-secondary); text-align: right; margin-top: -0.5rem; margin-bottom: 1rem; }
+    .specs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem 1rem; background: rgba(127,127,127,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0; font-size: 0.95rem; }
+    .detail-section { margin-bottom: 1.5rem; }
+    .detail-section h4 { margin-bottom: 0.5rem; color: var(--accent); font-size: 1.1rem; }
+    .detail-list { list-style: none; padding: 0; }
+    .detail-list li { padding: 0.3rem 0; border-bottom: 1px solid rgba(127,127,127,0.1); display: flex; justify-content: space-between; }
+    .detail-list li span:first-child { color: var(--text-secondary); }
+    .detail-list li span:last-child { font-weight: 600; }
+    .long-history { background: rgba(127,127,127,0.08); border-left: 4px solid var(--accent); padding: 1.2rem 1.5rem; border-radius: 8px; margin: 1rem 0; line-height: 1.7; font-size: 0.95rem; }
+    .long-history p { margin-bottom: 0.8rem; }
+    .long-history p:last-child { margin-bottom: 0; }
+    @media (max-width: 768px) {
+        header h1 { font-size: 1.8rem; }
+        .controls { flex-direction: column; align-items: stretch; }
+        .search-box { max-width: 100%; }
+        nav ul { justify-content: flex-start; }
+        .container { padding: 1.2rem; }
+        .modal-header h2 { font-size: 1.3rem; }
+        .tank-info { padding: 1.1rem; }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>🛡️ Tankopedia</h1>
+    <p>Полная энциклопедия бронетехники WW2 и современности</p>
+    <button class="settings-toggle" onclick="openSettings()" title="Настройки" aria-label="Настройки">⚙️</button>
+</header>
+
+<nav><ul id="navList"></ul></nav>
+
+<div class="container">
+    <div class="controls">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Поиск танка..." oninput="handleSearch()" autocomplete="off">
+        </div>
+        <div id="filterContainer"></div>
+    </div>
+    <div id="resultsCount" class="results-count"></div>
+    <div class="tanks-grid" id="tanksGrid"></div>
+</div>
+
+<div id="settingsModal" class="settings-modal" onclick="if(event.target === this) closeSettings()">
+    <div class="settings-content" role="dialog" aria-modal="true" aria-label="Настройки интерфейса">
+        <h2 style="margin-bottom:1.5rem;">Настройки интерфейса</h2>
+        <div class="setting-row"><label for="darkModeToggle">Тёмная тема</label>
+            <label class="switch"><input type="checkbox" id="darkModeToggle" onchange="toggleTheme()"><span class="slider"></span></label></div>
+        <div class="setting-row"><label for="cardSizeRange">Размер карточек</label>
+            <input type="range" min="280" max="450" step="10" value="350" id="cardSizeRange" oninput="updateCardSize(this.value)"></div>
+        <div class="setting-row"><label for="compactToggle">Компактный вид</label>
+            <label class="switch"><input type="checkbox" id="compactToggle" onchange="toggleCompact()"><span class="slider"></span></label></div>
+        <button onclick="resetSettings()" style="width:100%; padding:0.8rem; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; margin-top:1rem;">Сбросить настройки</button>
+        <button onclick="closeSettings()" style="width:100%; padding:0.8rem; background:transparent; border:1px solid var(--text-secondary); color:var(--text-main); border-radius:8px; cursor:pointer; margin-top:0.5rem;">Закрыть</button>
+    </div>
+</div>
+
+<div id="tankModal" class="modal" onclick="if(event.target === this) closeModal()">
+    <div class="modal-content" role="dialog" aria-modal="true">
+        <button class="close-modal" onclick="closeModal()" aria-label="Закрыть">×</button>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+/* =========================================================
+   ДАННЫЕ О ТАНКАХ
+   ========================================================= */
+const tanksData = [
+// ===================== GERMANY =====================
+{id:1,name:"Sturmgeschütz III Ausf. G",country:"germany",type:"medium",wikipedia:"Sturmgeschütz III",shortDesc:"Самая массовая САУ Вермахта",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"155 км",crew:"4 человека",armament:"7.5 cm StuK 40 L/48",armorDetails:"30–80 мм",specs:{"Годы":"1942-1945","Масса":"23.9 т","Орудие":"7.5 cm StuK 40","Броня":"30-80 мм","Произведено":"8400+"},history:"StuG III Ausf. G — самая массовая немецкая САУ периода Второй мировой войны. Низкий силуэт и мощное 75-мм орудие делали её опасным противником на всех фронтах.",fullHistory:"StuG III Ausf. G выпускался с декабря 1942 по апрель 1945 года и стал самой массовой модификацией этой САУ — более 8400 машин. По сути это была не САУ, а полноценный танк без вращающейся башни: низкий силуэт и мощное 75-мм орудие StuK 40 L/48 позволяли эффективно бороться с большинством танков союзников. На Восточном фронте StuG III часто использовались в роли «пожарной команды», а после войны трофейные машины служили в армиях Финляндии, Сирии, Испании и других стран."},
+{id:2,name:"Panzer IV Ausf. H",country:"germany",type:"medium",wikipedia:"Panzer IV",shortDesc:"Рабочая лошадка Панцерваффе",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"38 км/ч",range:"210 км",crew:"5 человек",armament:"7.5 cm KwK 40 L/48",armorDetails:"10–80 мм",specs:{"Годы":"1943-1945","Масса":"25 т","Орудие":"7.5 cm KwK 40","Броня":"10-80 мм","Произведено":"8500+"},history:"Pz.Kpfw. IV был единственным немецким танком, производившимся на протяжении всей войны. Ausf. H стал самой массовой модификацией с усиленной бронёй и длинноствольным орудием.",fullHistory:"Panzer IV Ausf. H выпускался с апреля 1943 по июль 1944 года. Эта модификация получила усиленную лобовую броню корпуса, 75-мм орудие KwK 40 L/48 и дополнительные 5-мм экраны. Всего было построено около 3774 машин этой версии. Pz.IV активно использовался на всех фронтах, а его шасси послужило базой для множества САУ — от StuG IV до Brummbär и Jagdpanzer IV."},
+{id:3,name:"Panther Ausf. G",country:"germany",type:"medium",wikipedia:"Panther tank",shortDesc:"Лучший средний танк Германии",engine:"Maybach HL 230 P30, 700 л.с.",speed:"46 км/ч",range:"200 км",crew:"5 человек",armament:"7.5 cm KwK 42 L/70",armorDetails:"16–100 мм",specs:{"Годы":"1943-1945","Масса":"44.8 т","Орудие":"7.5 cm KwK 42","Броня":"16-100 мм","Произведено":"2953"},history:"Panther считается одним из лучших танков Второй мировой войны. Отличное сочетание огневой мощи, бронезащиты и подвижности.",fullHistory:"Panther Ausf. G выпускался с марта 1944 по апрель 1945 года и стал самой массовой версией — около 2950 машин. Длинноствольное 75-мм орудие KwK 42 L/70 пробивало броню большинства танков союзников на дистанции до 2000 метров, а наклонная лобовая броня обеспечивала отличную защиту. Однако танк страдал от технических проблем, особенно в начале карьеры, и был сложен в производстве. Тем не менее, Panther считается одним из лучших средних танков Второй мировой войны."},
+{id:4,name:"Tiger I Ausf. E",country:"germany",type:"heavy",wikipedia:"Tiger I",shortDesc:"Легендарный тяжёлый танк",engine:"Maybach HL 230 P45, 700 л.с.",speed:"45.4 км/ч",range:"110–195 км",crew:"5 человек",armament:"8.8 cm KwK 36 L/56",armorDetails:"25–100 мм",specs:{"Годы":"1942-1944","Масса":"57 т","Орудие":"8.8 cm KwK 36","Броня":"25-100 мм","Произведено":"1347"},history:"Pz.Kpfw. VI Tiger — символ немецкой танковой мощи. Мощное 88-мм орудие и толстая броня компенсировались низким темпом производства.",fullHistory:"Tiger I Ausf. E производился с августа 1942 по август 1944 года. Всего было выпущено 1347 машин. Танк стал символом немецкой танковой мощи: 88-мм орудие KwK 36 L/56 могло уничтожить любой танк союзников на дистанции до 2000 м, а лобовая броня толщиной 100 мм делала его практически неуязвимым для большинства противотанковых орудий того времени. Однако Tiger был сложен и дорог в производстве, расходовал огромное количество топлива и страдал от недостатка мощности двигателя. Несмотря на мифологизацию, на поле боя он был уязвим для фланговых атак и авиации."},
+{id:5,name:"Tiger II (King Tiger)",country:"germany",type:"heavy",wikipedia:"Tiger II",shortDesc:"Самый тяжёлый серийный танк",engine:"Maybach HL 230 P30, 700 л.с.",speed:"41.5 км/ч",range:"170 км",crew:"5 человек",armament:"8.8 cm KwK 43 L/71",armorDetails:"25–185 мм",specs:{"Годы":"1944-1945","Масса":"68.5 т","Орудие":"8.8 cm KwK 43","Броня":"25-185 мм","Произведено":"492"},history:"Tiger II или Königstiger — самый тяжёлый серийный танк Второй мировой. Практически непробиваемая лобовая броня и мощнейшее орудие.",fullHistory:"Tiger II (Königstiger) выпускался с января 1944 по март 1945 года. Было построено всего 492 машины. Танк имел наклонную лобовую броню толщиной 150 мм и 88-мм орудие KwK 43 L/71, которое могло пробить броню любого танка союзников на дистанции до 3000 метров. Однако масса в 68,5 тонн создавала огромные проблемы с подвижностью, надёжностью и логистикой: большинство Tiger II были потеряны не в бою, а из-за технических неисправностей или нехватки топлива. Тем не менее, это был самый мощный серийный тяжёлый танк Второй мировой войны."},
+{id:6,name:"Jagdpanther",country:"germany",type:"medium",wikipedia:"Jagdpanther",shortDesc:"Истребитель танков на базе Panther",engine:"Maybach HL 230 P30, 700 л.с.",speed:"46 км/ч",range:"210 км",crew:"5 человек",armament:"8.8 cm Pak 43/3 L/71",armorDetails:"16–100 мм",specs:{"Годы":"1944-1945","Масса":"45.5 т","Орудие":"8.8 cm Pak 43","Броня":"16-100 мм","Произведено":"415"},history:"Jagdpanther — одна из лучших немецких ПТ-САУ. Сочетание мощного 88-мм орудия, хорошей бронезащиты и надёжного шасси Panther.",fullHistory:"Jagdpanther выпускался с января 1944 по март 1945 года. Всего было построено около 415 машин. Эта ПТ-САУ сочетала в себе мощное 88-мм орудие Pak 43/3 L/71, надёжное шасси Panther и хорошую бронезащиту. Низкий силуэт и отличная оптика делали Jagdpanther идеальной засадной машиной. Многие историки считают его лучшей немецкой ПТ-САУ Второй мировой войны. После войны несколько трофейных машин использовались во Франции и Великобритании для испытаний."},
+{id:7,name:"Jagdpanzer IV",country:"germany",type:"medium",wikipedia:"Jagdpanzer IV",shortDesc:"Противотанковая САУ",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"210 км",crew:"4 человека",armament:"7.5 cm Pak 39 L/48",armorDetails:"10–80 мм",specs:{"Годы":"1944-1945","Масса":"24 т","Орудие":"7.5 cm Pak 39/42","Броня":"10-80 мм","Произведено":"2000+"},history:"Jagdpanzer IV — эффективная и относительно простая в производстве ПТ-САУ. Низкий силуэт, хорошее орудие и достаточная бронезащита.",fullHistory:"Jagdpanzer IV выпускался с января 1944 по апрель 1945 года. Было построено около 2000 машин. Эта ПТ-САУ создавалась как замена StuG III и получила низкий силуэт, 75-мм орудие Pak 39 L/48 и достаточную бронезащиту. Машина оказалась эффективной и относительно простой в производстве. Позже появилась версия с более мощным орудием Pak 42 L/70, известная как Jagdpanzer IV/70(V)."},
+{id:8,name:"Panzer III Ausf. N",country:"germany",type:"medium",wikipedia:"Panzer III",shortDesc:"Основной танк до 1943 года",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"155 км",crew:"5 человек",armament:"7.5 cm KwK 37 L/24",armorDetails:"10–70 мм",specs:{"Годы":"1939-1943","Масса":"23 т","Орудие":"7.5 cm KwK 37","Броня":"10-70 мм","Произведено":"5700+"},history:"Pz.Kpfw. III был основным немецким танком в начале войны. Ausf. N получил короткоствольное 75-мм орудие для поддержки пехоты.",fullHistory:"Panzer III Ausf. N выпускался с июня 1942 по август 1943 года. Всего было переоборудовано или построено около 700 машин этой версии. Изначально Pz.III вооружался 37-мм, затем 50-мм орудием, но с появлением более мощных советских танков его огневая мощь стала недостаточной. Ausf. N получил короткоствольное 75-мм орудие KwK 37 L/24 для поддержки пехоты. После 1943 года Pz.III постепенно вытеснялся с передовой, но его шасси продолжало использоваться для StuG III и других машин."},
+{id:9,name:"Panzer II Ausf. L",country:"germany",type:"light",wikipedia:"Panzer II",shortDesc:"Лёгкий разведывательный танк",engine:"Maybach HL 66 P, 180 л.с.",speed:"60 км/ч",range:"200 км",crew:"3 человека",armament:"2 cm KwK 38 L/55",armorDetails:"5–30 мм",specs:{"Годы":"1935-1942","Масса":"11.8 т","Орудие":"2 cm KwK 38","Броня":"5-30 мм","Произведено":"1856"},history:"Pz.Kpfw. II — основной лёгкий танк вермахта в начале войны. Позже использовался как разведывательный.",fullHistory:"Panzer II Ausf. L (Luchs — «Рысь») выпускался с сентября 1943 по январь 1944 года. Было построено около 100 машин этой версии, хотя всего Pz.II различных модификаций выпустили более 1850 единиц. «Лукс» был разведывательным танком с усиленной броней и 20-мм автоматической пушкой. К 1943 году Pz.II уже устарел как боевая машина, но хорошо подходил для разведки. После войны трофейные Pz.II использовались в некоторых странах."},
+{id:10,name:"Panzer I Ausf. B",country:"germany",type:"light",wikipedia:"Panzer I",shortDesc:"Первый серийный немецкий танк",engine:"Krupp M 305, 60 л.с.",speed:"37 км/ч",range:"145 км",crew:"2 человека",armament:"2 × 7.92 мм MG 13",armorDetails:"7–13 мм",specs:{"Годы":"1934-1937","Масса":"8.9 т","Орудие":"2×7.92 мм MG","Броня":"7-13 мм","Произведено":"818"},history:"Pz.Kpfw. I — первый массовый немецкий танк. Изначально создавался как учебный. Вооружён только пулемётами.",fullHistory:"Panzer I Ausf. B выпускался с 1935 по 1937 год. Всего было построено 818 машин этой модификации. Pz.I изначально создавался как учебный танк, но впоследствии активно использовался в боях — в Испании, Польше и Франции. Вооружённый только двумя пулемётами, он был слаб в бою, но сыграл важную роль в подготовке немецких танкистов. На шасси Pz.I также создавались командирские машины и САУ."},
+{id:11,name:"Elefant (Ferdinand)",country:"germany",type:"heavy",wikipedia:"Elefant",shortDesc:"Тяжёлая САУ",engine:"2 × Maybach HL 120 TRM, 600 л.с.",speed:"30 км/ч",range:"150 км",crew:"6 человек",armament:"8.8 cm Pak 43/2 L/71",armorDetails:"до 200 мм",specs:{"Год":"1943","Масса":"65 т","Орудие":"8.8 cm Pak 43/2","Броня":"до 200 мм","Произведено":"91"},history:"Ferdinand/Elefant — тяжёлая САУ на шасси VK 45.01(P). Самое мощное орудие и практически непробиваемая лобовая броня.",fullHistory:"Ferdinand (позже переименованный в Elefant) был построен в 1943 году на шасси Porsche Tiger — проигравшего конкурс проекта. Всего выпущено 91 машина. САУ получила 88-мм орудие Pak 43/2 L/71 и лобовую броню толщиной 200 мм, которая была практически непробиваемой для большинства орудий союзников. Однако машина страдала от отсутствия пулемёта для ближнего боя и низкой подвижности. Впервые применённая под Курском, она показала себя грозным, но уязвимым для пехоты противником."},
+{id:12,name:"StuG IV",country:"germany",type:"medium",wikipedia:"StuG IV",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Sturmgeschutz_iv_Muzeum_Broni_Pancernej_CSWL_2.JPG/1280px-Sturmgeschutz_iv_Muzeum_Broni_Pancernej_CSWL_2.JPG",
+ shortDesc:"САУ на базе Panzer IV",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"38 км/ч",range:"210 км",crew:"4 человека",armament:"7.5 cm StuK 40 L/48",armorDetails:"10–80 мм",specs:{"Годы":"1943-1945","Масса":"23 т","Орудие":"7.5 cm StuK 40","Броня":"10-80 мм","Произведено":"1139"},history:"StuG IV — самоходка на шасси Pz.IV с рубкой от StuG III. Создана как временная мера, но оказалась успешной.",fullHistory:"StuG IV выпускался с декабря 1943 по март 1945 года. Было построено 1139 машин. Эта САУ создавалась как временная мера — шасси Panzer IV с рубкой от StuG III — после того, как заводы, выпускавшие StuG III, пострадали от бомбардировок. Несмотря на импровизированный характер, StuG IV оказалась удачной машиной и активно использовалась до конца войны. После войны трофейные StuG IV служили в армиях нескольких стран."},
+{id:13,name:"Jagdtiger",country:"germany",type:"heavy",wikipedia:"Jagdtiger",shortDesc:"Самая мощная немецкая САУ",engine:"Maybach HL 230 P30, 700 л.с.",speed:"38 км/ч",range:"120 км",crew:"6 человек",armament:"12.8 cm Pak 44 L/55",armorDetails:"40–250 мм",specs:{"Годы":"1944-1945","Масса":"71.7 т","Орудие":"12.8 cm Pak 44","Броня":"40-250 мм","Произведено":"88"},history:"Jagdtiger — самая мощная и тяжёлая серийная САУ Второй мировой. 128-мм орудие могло уничтожить любой танк союзников.",fullHistory:"Jagdtiger выпускался с июля 1944 по май 1945 года. Всего было построено 88 машин. Вооружённый 128-мм орудием Pak 44 L/55, Jagdtiger мог уничтожить любой танк союзников на дистанции до 4000 метров. Лобовая броня толщиной 250 мм была практически непробиваемой. Однако масса в 71,7 тонны делала машину крайне неповоротливой, а двигатель часто перегревался. Большинство Jagdtiger были потеряны не в бою, а из-за технических неисправностей."},
+{id:14,name:"Hetzer",country:"germany",type:"light",wikipedia:"Hetzer",shortDesc:"Лёгкая ПТ-САУ",engine:"Praga AC/2, 160 л.с.",speed:"42 км/ч",range:"180 км",crew:"4 человека",armament:"7.5 cm Pak 39 L/48",armorDetails:"8–60 мм",specs:{"Годы":"1944-1945","Масса":"16 т","Орудие":"7.5 cm Pak 39","Броня":"8-60 мм","Произведено":"2584"},history:"Jagdpanzer 38(t) Hetzer — лёгкая, но эффективная ПТ-САУ на чешском шасси. Низкий силуэт, хорошая бронезащита и мощное орудие.",fullHistory:"Hetzer (Jagdpanzer 38(t)) выпускался с апреля 1944 по май 1945 года. Всего было построено 2584 машины. Эта лёгкая ПТ-САУ на чешском шасси Pz.38(t) получила 75-мм орудие Pak 39 L/48 и наклонную броню, которая хорошо защищала от большинства противотанковых орудий. Низкий силуэт делал Hetzer идеальной засадной машиной. После войны несколько десятков трофейных Hetzer использовались в Швейцарии и Чехословакии."},
+{id:15,name:"Nashorn",country:"germany",type:"medium",wikipedia:"Nashorn",shortDesc:"САУ с 88-мм орудием",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"200 км",crew:"5 человек",armament:"8.8 cm Pak 43 L/71",armorDetails:"10–30 мм",specs:{"Годы":"1943-1945","Масса":"24 т","Орудие":"8.8 cm Pak 43","Броня":"10-30 мм","Произведено":"473"},history:"Nashorn (Носорог) — истребитель танков с мощным 88-мм орудием на лёгкой бронированной базе.",fullHistory:"Nashorn («Носорог») выпускался с февраля 1943 по март 1945 года. Было построено 473 машины. САУ получила мощное 88-мм орудие Pak 43 L/71, способное поражать любой танк союзников на дистанции до 3000 м. Однако бронирование было лёгким, а рубка открытой сверху — экипаж был уязвим для осколков и авиации. Nashorn использовался в основном в качестве засадной машины и показал себя эффективным истребителем танков."},
+{id:16,name:"Brummbär",country:"germany",type:"medium",wikipedia:"Brummbär",shortDesc:"Штурмовое орудие",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"210 км",crew:"5 человек",armament:"15 cm StuH 43 L/12",armorDetails:"10–100 мм",specs:{"Годы":"1943-1945","Масса":"28.2 т","Орудие":"15 cm sIG 33","Броня":"10-100 мм","Произведено":"306"},history:"Sturmpanzer IV Brummbär — штурмовое орудие для поддержки пехоты в городских боях. 150-мм гаубица была эффективна против укреплений.",fullHistory:"Brummbär (Sturmpanzer IV) выпускался с апреля 1943 по март 1945 года. Всего было построено 306 машин. Эта штурмовая САУ создавалась для поддержки пехоты в городских боях: 150-мм гаубица sIG 33 разрушала укрепления и дома, а броня толщиной до 100 мм защищала от противотанковых ружей. Brummbär использовался в основном на Восточном фронте и в Италии. Машина была эффективна, но страдала от низкой подвижности и высокого силуэта."},
+{id:17,name:"Marder III",country:"germany",type:"light",wikipedia:"Marder III",shortDesc:"Истребитель танков",engine:"Praga AC, 140 л.с.",speed:"42 км/ч",range:"190 км",crew:"4 человека",armament:"7.5 cm Pak 40 L/46",armorDetails:"10–50 мм",specs:{"Годы":"1942-1944","Масса":"10.5 т","Орудие":"7.5 cm Pak 40","Броня":"10-50 мм","Произведено":"1791"},history:"Marder III — ПТ-САУ на чешском шасси Pz.38(t). Открытая рубка, но мощное противотанковое орудие.",fullHistory:"Marder III выпускался с марта 1942 по май 1944 года. Было построено 1791 машина. Эта ПТ-САУ использовала шасси трофейного чехословацкого танка Pz.38(t) и 75-мм противотанковое орудие Pak 40. Открытая сверху рубка делала экипаж уязвимым для осколков, но мощное орудие позволяло эффективно бороться с советскими Т-34 и КВ. Marder III активно использовался на всех фронтах до конца войны."},
+{id:18,name:"Pz.38(t)",country:"germany",type:"light",wikipedia:"Panzer 38(t)",shortDesc:"Чешский танк на немецкой службе",engine:"Praga EPA, 125 л.с.",speed:"42 км/ч",range:"250 км",crew:"4 человека",armament:"3.7 cm KwK 38(t) L/47",armorDetails:"10–25 мм",specs:{"Годы":"1938-1942","Масса":"9.5 т","Орудие":"3.7 cm KwK","Броня":"10-25 мм","Произведено":"1400+"},history:"Panzer 38(t) — чехословацкий танк, захваченный Германией. Надёжный и простой, широко использовался в начале войны.",fullHistory:"Panzer 38(t) выпускался с 1938 по 1942 год. Всего было построено более 1400 машин. Чехословацкий танк LT vz. 38 был захвачен Германией после оккупации Чехословакии и получил обозначение Pz.Kpfw. 38(t). Надёжный, простой в обслуживании и хорошо сбалансированный, он активно использовался в Польской и Французской кампаниях, а также на Восточном фронте. Шасси Pz.38(t) послужило базой для множества немецких САУ, включая Hetzer и Marder III."},
+{id:19,name:"VK 30.01(H)",country:"germany",type:"medium",wikipedia:"VK 30.01 (H)",shortDesc:"Прототип среднего танка",engine:"Maybach HL 116, 300 л.с.",speed:"35 км/ч",range:"150 км",crew:"5 человек",armament:"5 cm KwK 39 L/60",armorDetails:"до 50 мм",specs:{"Год":"1941","Масса":"30 т","Орудие":"5 cm KwK","Броня":"до 50 мм","Произведено":"4"},history:"VK 30.01(H) — прототип среднего танка Henschel. Предшественник Tiger I.",fullHistory:"VK 30.01(H) был создан в 1941 году как прототип среднего танка для замены Panzer IV. Было построено 4 экземпляра. Машина должна была получить 75-мм орудие, но в итоге проект был отменён в пользу более тяжёлого VK 45.01(H) — будущего Tiger I. Опыт, полученный при разработке VK 30.01(H), был использован при создании тяжёлых танков."},
+{id:20,name:"Sturer Emil",country:"germany",type:"heavy",wikipedia:"Sturer Emil",shortDesc:"Экспериментальная САУ",engine:"Maybach HL 116, 300 л.с.",speed:"25 км/ч",range:"200 км",crew:"5 человек",armament:"12.8 cm Kanone 40 L/61",armorDetails:"до 50 мм",specs:{"Год":"1941","Масса":"35 т","Орудие":"12.8 cm Flak 40","Броня":"до 50 мм","Произведено":"2"},history:"Sturer Emil — экспериментальный истребитель танков с 128-мм зенитным орудием. Участвовал в боях под Сталинградом.",fullHistory:"Sturer Emil («Упрямый Эмиль») был построен в 1941 году в двух экземплярах. Эти экспериментальные ПТ-САУ использовали шасси VK 30.01(H) и 128-мм зенитное орудие Flak 40. Обе машины были отправлены на Восточный фронт и участвовали в боях под Сталинградом. Одна из них была захвачена советскими войсками и сейчас находится в музее. Проект был признан неудачным из-за низкой подвижности и малого боекомплекта."},
+
+// ===================== USSR =====================
+{id:21,name:"Т-34/76",country:"ussr",type:"medium",wikipedia:"T-34",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/T-34-76_RB8.JPG",
+ wtImage:"https://old-wiki.warthunder.ru/images/T-34-76_1941.jpg",
+ shortDesc:"Легендарный средний танк",engine:"В-2-34, 500 л.с.",speed:"53 км/ч",range:"300–400 км",crew:"4 человека",armament:"76.2 мм Ф-34",armorDetails:"13–52 мм",specs:{"Годы":"1940-1943","Масса":"26.5 т","Орудие":"76.2 мм Ф-34","Броня":"13-52 мм","Произведено":"35000+"},history:"Т-34 — самый массовый танк Второй мировой войны. Революционная наклонная броня, дизельный двигатель В-2 и простота производства.",fullHistory:"Т-34/76 выпускался с 1940 по 1943 год. Всего было построено более 35 000 машин всех модификаций. Т-34 стал революцией в танкостроении благодаря наклонной броне, дизельному двигателю В-2 и простоте производства. В 1941 году он был практически неуязвим для немецких противотанковых орудий, что вызвало шок в германском командовании. Наклонная броня увеличивала эффективную толщину, а широкие гусеницы обеспечивали отличную проходимость. Т-34 стал символом Победы и самым массовым танком Второй мировой войны."},
+{id:22,name:"Т-34/85",country:"ussr",type:"medium",wikipedia:"T-34",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Tank_T34-85.jpg/1280px-Tank_T34-85.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ wtImage:"https://old-wiki.warthunder.ru/images/T-34-85_1944.jpg",
+ shortDesc:"Улучшенная версия Т-34",engine:"В-2-34, 500 л.с.",speed:"53 км/ч",range:"300–400 км",crew:"5 человек",armament:"85 мм ЗИС-С-53",armorDetails:"20–90 мм",specs:{"Годы":"1944-1950-е","Масса":"32 т","Орудие":"85 мм ЗИС-С-53","Броня":"20-90 мм","Произведено":"22500+"},history:"Т-34/85 — модернизированная версия с новой трёхместной башней и 85-мм орудием.",fullHistory:"Т-34/85 выпускался с 1944 года и стал самой массовой модификацией — более 22 500 машин. Новая трёхместная башня позволила разместить командира, наводчика и заряжающего, что резко повысило эффективность экипажа. 85-мм орудие ЗИС-С-53 могло эффективно бороться с Tiger и Panther. Т-34/85 активно использовался до конца войны и после неё, поставлялся в страны Варшавского договора и участвовал во множестве конфликтов XX века."},
+{id:23,name:"ИС-2",country:"ussr",type:"heavy",wikipedia:"IS-2",shortDesc:"Тяжёлый танк прорыва",engine:"В-2-ИС, 520 л.с.",speed:"37 км/ч",range:"240 км",crew:"4 человека",armament:"122 мм Д-25Т",armorDetails:"30–120 мм",specs:{"Годы":"1943-1946","Масса":"46 т","Орудие":"122 мм Д-25Т","Броня":"30-120 мм","Произведено":"3854"},history:"ИС-2 (Иосиф Сталин) — тяжёлый танк для прорыва укреплений. 122-мм орудие гарантированно поражало любую немецкую технику.",fullHistory:"ИС-2 выпускался с октября 1943 по 1946 год. Всего было построено 3854 машины. Тяжёлый танк прорыва получил 122-мм орудие Д-25Т, которое гарантированно поражало любую немецкую технику, и мощную броню. Однако 122-мм орудие имело низкую скорострельность из-за раздельного заряжания. ИС-2 активно использовался в конце войны, особенно в городских боях (Берлин, Будапешт). После войны он поставлялся в Китай и КНДР и участвовал в Корейской войне."},
+{id:24,name:"ИС-3",country:"ussr",type:"heavy",wikipedia:"IS-3",shortDesc:"Послевоенный тяжёлый танк",engine:"В-2-ИС, 520 л.с.",speed:"40 км/ч",range:"185 км",crew:"4 человека",armament:"122 мм Д-25Т",armorDetails:"20–220 мм",specs:{"Годы":"1945-1946","Масса":"46.5 т","Орудие":"122 мм Д-25Т","Броня":"20-220 мм","Произведено":"2311"},history:"ИС-3 — последний тяжёлый танк Второй мировой. Уникальная приплюснутая башня и мощная броня.",fullHistory:"ИС-3 был принят на вооружение в 1945 году. Всего было построено 2311 машин. Танк получил уникальную приплюснутую башню («щучья морда») и мощную броню, которая делала его практически неуязвимым для большинства орудий того времени. ИС-3 не успел принять участие в боях Второй мировой, но произвёл огромное впечатление на союзников на параде в Берлине в 1945 году. Впоследствии танк использовался в различных конфликтах, включая Венгрию 1956 года."},
+{id:25,name:"КВ-1",country:"ussr",type:"heavy",wikipedia:"Kliment Voroshilov tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Kliment_Voroshilov_KV-1_model_1942_-_Central_Armed_Forces_Museum%2C_Moscow_%2838859717001%29.jpg/1280px-Kliment_Voroshilov_KV-1_model_1942_-_Central_Armed_Forces_Museum%2C_Moscow_%2838859717001%29.jpg",
+ shortDesc:"Тяжёлый танк Клим Ворошилов",engine:"В-2К, 600 л.с.",speed:"34 км/ч",range:"225 км",crew:"5 человек",armament:"76.2 мм Ф-34",armorDetails:"30–90 мм",specs:{"Годы":"1939-1942","Масса":"45 т","Орудие":"76.2 мм Ф-34","Броня":"30-90 мм","Произведено":"2769"},history:"КВ-1 — тяжёлый танк с мощной бронёй. В 1941 году был практически неуязвим для немецких орудий.",fullHistory:"КВ-1 выпускался с 1939 по 1942 год. Всего было построено 2769 машин. Тяжёлый танк «Клим Ворошилов» получил мощную броню толщиной до 90 мм, которая в 1941 году делала его практически неуязвимым для немецких противотанковых орудий. КВ-1 сыграл важную роль в обороне Ленинграда и Москвы. Известен случай, когда один КВ-1 под командованием лейтенанта Зиновия Колобанова уничтожил 22 немецких танка в одном бою. Однако танк страдал от низкой подвижности и ненадёжной трансмиссии."},
+{id:26,name:"КВ-2",country:"ussr",type:"heavy",wikipedia:"KV-2",
+ image:"https://upload.wikimedia.org/wikipedia/commons/5/51/%D0%9A%D0%B2-2_1.jpg",
+ shortDesc:"Штурмовой танк с 152-мм гаубицей",engine:"В-2К, 600 л.с.",speed:"26 км/ч",range:"250 км",crew:"6 человек",armament:"152 мм М-10Т",armorDetails:"30–110 мм",specs:{"Годы":"1940-1941","Масса":"52 т","Орудие":"152 мм М-10","Броня":"30-110 мм","Произведено":"334"},history:"КВ-2 — штурмовой танк с огромной башней и 152-мм гаубицей. Эффективен против укреплений, но медленный и высокий.",fullHistory:"КВ-2 выпускался с 1940 по 1941 год. Всего было построено 334 машины. Штурмовой танк с огромной башней и 152-мм гаубицей М-10Т был создан для разрушения укреплений. В начале войны КВ-2 наводил ужас на немецкие войска: его броня была неуязвима для большинства орудий, а 152-мм снаряды могли уничтожить любой танк. Однако машина была медленной, высокой и страдала от низкой надёжности. Один КВ-2 под Расейняем в одиночку сдерживал немецкую дивизию в течение дня."},
+{id:27,name:"Т-60",country:"ussr",type:"light",wikipedia:"T-60",shortDesc:"Лёгкий танк поддержки",engine:"ГАЗ-202, 70 л.с.",speed:"42 км/ч",range:"450 км",crew:"2 человека",armament:"20 мм ТНШ",armorDetails:"7–35 мм",specs:{"Годы":"1941-1943","Масса":"6.8 т","Орудие":"20 мм ТНШ","Броня":"7-35 мм","Произведено":"6292"},history:"Т-60 — лёгкий танк для разведки и поддержки пехоты. Прост в производстве, но слабо вооружён.",fullHistory:"Т-60 выпускался с 1941 по 1943 год. Всего было построено 6292 машины. Лёгкий танк создавался в спешке после начала войны и был прост в производстве: его могли выпускать даже автомобильные заводы. Однако 20-мм автоматическая пушка ТНШ была слаба против немецких танков. Т-60 использовался для разведки и поддержки пехоты, а также как тягач. Несмотря на слабость, танк сыграл важную роль в битве за Москву."},
+{id:28,name:"Т-70",country:"ussr",type:"light",wikipedia:"T-70",shortDesc:"Лёгкий танк",engine:"2 × ГАЗ-202, 140 л.с.",speed:"45 км/ч",range:"360 км",crew:"2 человека",armament:"45 мм 20-К",armorDetails:"10–45 мм",specs:{"Годы":"1942-1943","Масса":"9.2 т","Орудие":"45 мм 20-К","Броня":"10-45 мм","Произведено":"8226"},history:"Т-70 — улучшенный лёгкий танк с 45-мм орудием.",fullHistory:"Т-70 выпускался с 1942 по 1943 год. Всего было построено 8226 машин. Улучшенная версия Т-60 получила 45-мм орудие 20-К и два двигателя ГАЗ-202. Т-70 был более эффективен в бою, но всё ещё страдал от тесной башни (экипаж из двух человек) и слабой брони. Танк использовался для разведки и поддержки пехоты, а его шасси послужило базой для САУ СУ-76."},
+{id:29,name:"Т-35",country:"ussr",type:"heavy",wikipedia:"T-35",shortDesc:"Пятибашенный гигант",engine:"М-17Т, 500 л.с.",speed:"30 км/ч",range:"150 км",crew:"11 человек",armament:"76.2 мм КТ-28 + 2×45 мм + пулемёты",armorDetails:"20–30 мм",specs:{"Годы":"1933-1939","Масса":"45 т","Экипаж":"11 чел.","Башни":"5 шт.","Произведено":"61"},history:"Т-35 — единственный серийный пятибашенный танк в истории. Парадная машина с мощным вооружением, но архаичной концепцией.",fullHistory:"Т-35 выпускался с 1933 по 1939 год. Всего было построено 61 машина. Единственный в мире серийный пятибашенный танк был гордостью советских парадов, но в бою оказался практически бесполезен: огромные размеры, слабая броня и низкая надёжность делали его лёгкой мишенью. Большинство Т-35 были потеряны в первые месяцы войны. Сохранился лишь один экземпляр в музее Кубинки."},
+{id:30,name:"БТ-7",country:"ussr",type:"light",wikipedia:"BT-7",shortDesc:"Быстроходный колёсно-гусеничный",engine:"М-17Т, 400 л.с.",speed:"52 км/ч (гусеницы); 72 км/ч (колёса)",range:"375 км",crew:"3 человека",armament:"45 мм 20-К",armorDetails:"6–20 мм",specs:{"Годы":"1935-1940","Масса":"13.9 т","Скорость":"86 км/ч","Орудие":"45 мм","Произведено":"7884"},history:"БТ-7 — быстроходный танк с колёсно-гусеничным движителем. Рекордная скорость, но слабая броня.",fullHistory:"БТ-7 выпускался с 1935 по 1940 год. Всего было построено 7884 машины. Быстроходный танк с колёсно-гусеничным движителем развивал рекордную скорость — до 86 км/ч на колёсах. Однако слабая броня и отсутствие радиостанции (на большинстве машин) делали его уязвимым в бою. БТ-7 активно использовался в боях на Халхин-Голе и в начале Великой Отечественной войны."},
+{id:31,name:"БТ-5",country:"ussr",type:"light",wikipedia:"BT-5",shortDesc:"Предшественник БТ-7",engine:"М-5, 400 л.с.",speed:"52 км/ч (гусеницы); 72 км/ч (колёса)",range:"300 км",crew:"3 человека",armament:"45 мм 20-К",armorDetails:"6–13 мм",specs:{"Годы":"1933-1934","Масса":"11.5 т","Скорость":"72 км/ч","Орудие":"45 мм","Произведено":"1884"},history:"БТ-5 — развитие конструкции Кристи. Участвовал в Гражданской войне в Испании.",fullHistory:"БТ-5 выпускался с 1933 по 1934 год. Всего было построено 1884 машины. Развитие конструкции американского инженера Кристи получило 45-мм орудие и улучшенную башню. БТ-5 участвовал в Гражданской войне в Испании, где показал себя с лучшей стороны, и в боях на Халхин-Голе. К началу Великой Отечественной войны устарел."},
+{id:32,name:"Т-28",country:"ussr",type:"medium",wikipedia:"T-28",shortDesc:"Средний танк с тремя башнями",engine:"М-17Л, 500 л.с.",speed:"37 км/ч",range:"220 км",crew:"6 человек",armament:"76.2 мм КТ-28 + 2×7.62 мм пулемёта",armorDetails:"20–30 мм",specs:{"Годы":"1933-1940","Масса":"28 т","Орудие":"76.2 мм","Башни":"3 шт.","Произведено":"503"},history:"Т-28 — средний танк с тремя башнями по образцу британского Vickers A1E1 Independent.",fullHistory:"Т-28 выпускался с 1933 по 1940 год. Всего было построено 503 машины. Средний танк с тремя башнями создавался по образцу британского Vickers A1E1 Independent. В 1930-е годы Т-28 считался мощной машиной, но к началу войны устарел: слабая броня и низкая надёжность делали его уязвимым. Тем не менее, Т-28 участвовал в Зимней войне и в первые месяцы Великой Отечественной."},
+{id:33,name:"Т-26",country:"ussr",type:"light",wikipedia:"T-26",shortDesc:"Самый массовый танк 1930-х",engine:"Т-26, 90 л.с.",speed:"30 км/ч",range:"180 км",crew:"3 человека",armament:"45 мм 20-К",armorDetails:"6–15 мм",specs:{"Годы":"1931-1940","Масса":"10.5 т","Орудие":"45 мм","Броня":"6-15 мм","Произведено":"11000+"},history:"Т-26 — советская версия британского Vickers 6-Ton. Самый массовый танк 1930-х годов.",fullHistory:"Т-26 выпускался с 1931 по 1940 год. Всего было построено более 11 000 машин. Советская версия британского Vickers 6-Ton стала самым массовым танком 1930-х годов и основой бронетанковых войск РККА. Т-26 участвовал в Гражданской войне в Испании, на Халхин-Голе, в Зимней войне. К началу Великой Отечественной устарел: слабая броня и низкая надёжность привели к огромным потерям."},
+{id:34,name:"МС-1 (Т-18)",country:"ussr",type:"light",wikipedia:"T-18 tank",shortDesc:"Первый советский танк",engine:"МС-1, 35 л.с.",speed:"17 км/ч",range:"100 км",crew:"2 человека",armament:"37 мм Гочкиса",armorDetails:"8–16 мм",specs:{"Годы":"1928-1931","Масса":"5.3 т","Орудие":"37 мм","Экипаж":"2 чел.","Произведено":"959"},history:"МС-1 (Малый танк сопровождения) — первый советский серийный танк собственной конструкции на базе Renault FT.",fullHistory:"МС-1 (Т-18) выпускался с 1928 по 1931 год. Всего было построено 959 машин. Первый советский серийный танк собственной конструкции создавался на базе французского Renault FT. МС-1 («Малый танк сопровождения») стал важным шагом в развитии советского танкостроения, хотя к началу войны безнадёжно устарел. Часть машин использовалась как учебные и в боях под Москвой."},
+{id:35,name:"СУ-100",country:"ussr",type:"medium",wikipedia:"SU-100",shortDesc:"Истребитель танков",engine:"В-2-34, 500 л.с.",speed:"50 км/ч",range:"310 км",crew:"4 человека",armament:"100 мм Д-10С",armorDetails:"15–100 мм",specs:{"Годы":"1944-1947","Масса":"31.6 т","Орудие":"100 мм Д-10С","Броня":"15-100 мм","Произведено":"2335"},history:"СУ-100 — мощная ПТ-САУ на базе Т-34. 100-мм орудие эффективно поражало все немецкие танки.",fullHistory:"СУ-100 выпускалась с 1944 по 1947 год. Всего было построено 2335 машин. Мощная ПТ-САУ на базе Т-34 получила 100-мм орудие Д-10С, которое эффективно поражало все немецкие танки, включая Tiger и Panther. СУ-100 активно использовалась в конце войны и после неё, поставлялась в страны Варшавского договора и участвовала во множестве конфликтов."},
+{id:36,name:"СУ-85",country:"ussr",type:"medium",wikipedia:"SU-85",shortDesc:"Противотанковая САУ",engine:"В-2-34, 500 л.с.",speed:"50 км/ч",range:"300 км",crew:"4 человека",armament:"85 мм Д-5С",armorDetails:"20–75 мм",specs:{"Годы":"1943-1944","Масса":"29.6 т","Орудие":"85 мм Д-5С","Броня":"20-75 мм","Произведено":"2650"},history:"СУ-85 — ПТ-САУ для борьбы с новыми немецкими танками. 85-мм орудие было эффективным против Tiger и Panther.",fullHistory:"СУ-85 выпускалась с 1943 по 1944 год. Всего было построено 2650 машин. ПТ-САУ создавалась для борьбы с новыми немецкими танками — Tiger и Panther. 85-мм орудие Д-5С было эффективным против них, но слабее, чем 100-мм орудие СУ-100, которая пришла ей на смену."},
+{id:37,name:"СУ-76",country:"ussr",type:"light",wikipedia:"SU-76",shortDesc:"Лёгкая САУ",engine:"2 × ГАЗ-202, 140 л.с.",speed:"45 км/ч",range:"320 км",crew:"4 человека",armament:"76.2 мм ЗИС-3",armorDetails:"10–35 мм",specs:{"Годы":"1942-1945","Масса":"10.5 т","Орудие":"76.2 мм","Броня":"10-35 мм","Произведено":"13732"},history:"СУ-76 — самая массовая советская САУ. Простая и дешёвая, использовалась для поддержки пехоты.",fullHistory:"СУ-76 выпускалась с 1942 по 1945 год. Всего было построено 13 732 машины — самая массовая советская САУ. Простая и дешёвая, она использовалась для поддержки пехоты. 76-мм орудие ЗИС-3 было эффективно против укреплений и лёгких танков, но слабо против тяжёлых. СУ-76 получила прозвище «Голожопая» из-за открытой рубки и слабой брони. Тем не менее, она сыграла важную роль в войне."},
+{id:38,name:"ИСУ-152",country:"ussr",type:"heavy",wikipedia:"ISU-152",shortDesc:"Штурмовое орудие",engine:"В-2-ИС, 520 л.с.",speed:"37 км/ч",range:"220 км",crew:"5 человек",armament:"152 мм МЛ-20С",armorDetails:"30–90 мм",specs:{"Годы":"1943-1945","Масса":"46 т","Орудие":"152 мм МЛ-20","Броня":"30-90 мм","Произведено":"3242"},history:"ИСУ-152 — штурмовое орудие на базе ИС. 152-мм гаубица-пушка эффективна против укреплений и танков.",fullHistory:"ИСУ-152 выпускалась с 1943 по 1945 год. Всего было построено 3242 машины. Штурмовое орудие на базе ИС получило 152-мм гаубицу-пушку МЛ-20, которая была эффективна против укреплений и танков. ИСУ-152 получила прозвище «Зверобой» за способность уничтожать немецкие «Тигры» и «Пантеры». Тяжёлые снаряды могли срывать башни с вражеских танков."},
+{id:39,name:"БА-64",country:"ussr",type:"light",wikipedia:"BA-64",shortDesc:"Бронеавтомобиль",engine:"ГАЗ-64, 50 л.с.",speed:"80 км/ч",range:"540 км",crew:"2 человека",armament:"7.62 мм ДТ",armorDetails:"4–15 мм",specs:{"Годы":"1942-1946","Масса":"2.36 т","Орудие":"7.62 мм ДТ","Экипаж":"2 чел.","Произведено":"9110"},history:"БА-64 — лёгкий бронеавтомобиль для разведки. Высокая проходимость и манёвренность.",fullHistory:"БА-64 выпускался с 1942 по 1946 год. Всего было построено 9110 машин. Лёгкий бронеавтомобиль создавался для разведки и получил высокую проходимость и манёвренность. БА-64 использовался на всех фронтах и показал себя надёжной машиной. После войны он использовался в различных странах."},
+{id:40,name:"А-20",country:"ussr",type:"medium",wikipedia:"A-20 tank",
+ image:"https://upload.wikimedia.org/wikipedia/commons/4/4b/%D0%A2%D0%B0%D0%BD%D0%BA_%D0%91%D1%82-20.jpg",
+ shortDesc:"Прототип Т-34",engine:"В-2, 500 л.с.",speed:"65 км/ч",range:"300 км",crew:"4 человека",armament:"45 мм 20-К",armorDetails:"10–30 мм",specs:{"Год":"1939","Масса":"18 т","Орудие":"45 мм","Броня":"10-30 мм","Произведено":"1"},history:"А-20 — прототип колёсно-гусеничного танка, предшественник Т-34.",fullHistory:"А-20 был создан в 1939 году в единственном экземпляре. Прототип колёсно-гусеничного танка стал предшественником легендарного Т-34. В ходе испытаний А-20 показал высокую скорость, но военные отдали предпочтение гусеничному варианту — будущему Т-34."},
+
+// ===================== USA =====================
+{id:41,name:"M4 Sherman",country:"usa",type:"medium",wikipedia:"M4 Sherman",shortDesc:"Основной танк США",engine:"Continental R975, 400 л.с.",speed:"38 км/ч",range:"190 км",crew:"5 человек",armament:"75 мм M3 / 76 мм M1",armorDetails:"12–100 мм",specs:{"Годы":"1942-1945","Масса":"30-36 т","Орудие":"75/76 мм","Броня":"12-100 мм","Произведено":"49000+"},history:"M4 Sherman — основной американский средний танк Второй мировой. Самый массовый танк США.",fullHistory:"M4 Sherman выпускался с 1942 по 1945 год. Всего было построено около 49 000 машин всех модификаций — самый массовый танк США и второй по массовости в мире после Т-34. Sherman стал основой бронетанковых войск США и широко поставлялся союзникам по ленд-лизу. Танк был надёжным, простым в обслуживании и технологичным в производстве. Однако его броня и 75-мм орудие уступали немецким Tiger и Panther, что привело к большим потерям. После войны Sherman использовался в множестве стран."},
+{id:42,name:"M4A3E8 Sherman",country:"usa",type:"medium",wikipedia:"M4 Sherman",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Sherman_Mk.IIIAY_%E2%80%9CFury%E2%80%9D_%2844431847595%29.jpg/1280px-Sherman_Mk.IIIAY_%E2%80%9CFury%E2%80%9D_%2844431847595%29.jpg",
+ shortDesc:"Easy Eight — лучшая версия",engine:"Ford GAA V8, 500 л.с.",speed:"42 км/ч",range:"160 км",crew:"5 человек",armament:"76 мм M1A2",armorDetails:"12–100 мм",specs:{"Годы":"1944-1945","Масса":"35 т","Орудие":"76 мм M1","Подвеска":"HVSS","Произведено":"4000+"},history:"M4A3E8 «Easy Eight» — лучшая модификация Sherman. Новая подвеска HVSS, 76-мм орудие.",fullHistory:"M4A3E8 Sherman («Easy Eight») выпускался с 1944 по 1945 год. Всего было построено около 4000 машин. Лучшая модификация Sherman получила новую подвеску HVSS, которая значительно улучшила проходимость и плавность хода, а также 76-мм орудие M1A2. Easy Eight активно использовался в конце войны и после неё — в Корее и других конфликтах. Многие историки считают его лучшим вариантом Sherman."},
+{id:43,name:"M26 Pershing",country:"usa",type:"heavy",wikipedia:"M26 Pershing",shortDesc:"Тяжёлый танк",engine:"Ford GAF V8, 500 л.с.",speed:"40 км/ч",range:"160 км",crew:"5 человек",armament:"90 мм M3",armorDetails:"19–102 мм",specs:{"Годы":"1945-1946","Масса":"41.7 т","Орудие":"90 мм M3","Броня":"19-102 мм","Произведено":"2200"},history:"M26 Pershing — американский тяжёлый танк конца войны. Появился слишком поздно для массового участия в ВМВ.",fullHistory:"M26 Pershing выпускался с 1945 по 1946 год. Всего было построено около 2200 машин. Тяжёлый танк с 90-мм орудием M3 появился слишком поздно для массового участия в боях Второй мировой, но успел повоевать в Европе. Pershing был эффективен против Tiger и Panther, но страдал от низкой надёжности. После войны он участвовал в Корейской войне, где показал себя с лучшей стороны."},
+{id:44,name:"M10 Wolverine",country:"usa",type:"medium",wikipedia:"M10 tank destroyer",shortDesc:"Противотанковая САУ",engine:"General Motors 6046, 375 л.с.",speed:"48 км/ч",range:"300 км",crew:"5 человек",armament:"76.2 мм M7",armorDetails:"7–38 мм",specs:{"Годы":"1942-1944","Масса":"29.6 т","Орудие":"76.2 мм M7","Броня":"7-38 мм","Произведено":"6706"},history:"M10 Wolverine — ПТ-САУ на базе Sherman. Открытая сверху рубка, хорошее 76-мм орудие.",fullHistory:"M10 Wolverine выпускался с 1942 по 1944 год. Всего было построено 6706 машин. ПТ-САУ на базе Sherman получила открытую сверху рубку и 76-мм орудие M7. M10 была эффективна против немецких танков, но её броня была слабой. Танк использовался США, Великобританией (под названием Achilles) и другими союзниками."},
+{id:45,name:"M18 Hellcat",country:"usa",type:"light",wikipedia:"M18 Hellcat",shortDesc:"Самая быстрая САУ",engine:"Continental R975, 400 л.с.",speed:"88 км/ч",range:"160 км",crew:"5 человек",armament:"76.2 мм M1A1",armorDetails:"7–25 мм",specs:{"Годы":"1943-1944","Масса":"18 т","Скорость":"88 км/ч","Орудие":"76.2 мм","Произведено":"2507"},history:"M18 Hellcat — самая быстрая американская бронемашина ВМВ. Тактика «выстрелил-убежал».",fullHistory:"M18 Hellcat выпускался с 1943 по 1944 год. Всего было построено 2507 машин. Самая быстрая американская бронемашина Второй мировой войны развивала скорость до 88 км/ч. Лёгкая броня компенсировалась скоростью: тактика «выстрелил-убежал» позволяла Hellcat эффективно бороться с тяжёлыми немецкими танками. M18 активно использовался в Европе в 1944-1945 годах."},
+{id:46,name:"M36 Jackson",country:"usa",type:"medium",wikipedia:"M36 tank destroyer",shortDesc:"Истребитель танков с 90-мм орудием",engine:"Ford GAA V8, 500 л.с.",speed:"42 км/ч",range:"240 км",crew:"5 человек",armament:"90 мм M3",armorDetails:"7–51 мм",specs:{"Годы":"1944-1945","Масса":"28.5 т","Орудие":"90 мм M3","Броня":"7-51 мм","Произведено":"1400+"},history:"M36 Jackson — ПТ-САУ с мощным 90-мм орудием для борьбы с тяжёлыми немецкими танками.",fullHistory:"M36 Jackson выпускался с 1944 по 1945 год. Всего было построено более 1400 машин. ПТ-САУ с мощным 90-мм орудием M3 создавалась для борьбы с тяжёлыми немецкими танками. Jackson был эффективен против Tiger и Panther, но его броня оставалась слабой. M36 активно использовался в конце войны и в Корее."},
+{id:47,name:"M3 Lee/Grant",country:"usa",type:"medium",wikipedia:"M3 Lee",shortDesc:"Средний танк с 75-мм орудием",engine:"Continental R975, 400 л.с.",speed:"42 км/ч",range:"190 км",crew:"6 человек",armament:"75 мм M2 + 37 мм M5",armorDetails:"12–51 мм",specs:{"Годы":"1941-1942","Масса":"27 т","Орудие":"75 мм + 37 мм","Броня":"12-51 мм","Произведено":"6258"},history:"M3 Lee/Grant — средний танк с 75-мм орудием в корпусе. Временное решение до появления Sherman.",fullHistory:"M3 Lee/Grant выпускался с 1941 по 1942 год. Всего было построено 6258 машин. Средний танк с 75-мм орудием в корпусе и 37-мм орудием в башне был временным решением до появления Sherman. M3 активно использовался британцами в Северной Африке (под названием Grant) и поставлялся в СССР по ленд-лизу."},
+{id:48,name:"M5 Stuart",country:"usa",type:"light",wikipedia:"M5 Stuart",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/M5A1_Kubinka.JPG/1280px-M5A1_Kubinka.JPG",
+ shortDesc:"Лёгкий разведывательный танк",engine:"2 × Cadillac V8, 220 л.с.",speed:"58 км/ч",range:"160 км",crew:"4 человека",armament:"37 мм M6",armorDetails:"10–38 мм",specs:{"Годы":"1942-1944","Масса":"14.7 т","Орудие":"37 мм","Броня":"10-38 мм","Произведено":"8884"},history:"M5 Stuart — лёгкий танк для разведки. Улучшенная версия M3 Stuart с двумя двигателями.",fullHistory:"M5 Stuart выпускался с 1942 по 1944 год. Всего было построено 8884 машины. Лёгкий танк для разведки стал улучшенной версией M3 Stuart с двумя двигателями Cadillac. M5 активно использовался США и союзниками, но к концу войны устарел."},
+{id:49,name:"M24 Chaffee",country:"usa",type:"light",wikipedia:"M24 Chaffee",shortDesc:"Лёгкий танк",engine:"2 × Cadillac V8, 220 л.с.",speed:"56 км/ч",range:"160 км",crew:"5 человек",armament:"75 мм M6",armorDetails:"12–25 мм",specs:{"Годы":"1944-1945","Масса":"18.4 т","Орудие":"75 мм","Броня":"12-25 мм","Произведено":"4731"},history:"M24 Chaffee — лёгкий танк с хорошим 75-мм орудием. Появился в конце войны.",fullHistory:"M24 Chaffee выпускался с 1944 по 1945 год. Всего было построено 4731 машина. Лёгкий танк с хорошим 75-мм орудием появился в конце войны и заменил устаревшие Stuart. Chaffee активно использовался в Европе, а после войны — в Корее и других конфликтах."},
+{id:50,name:"M22 Locust",country:"usa",type:"light",wikipedia:"M22 Locust",shortDesc:"Авиадесантный танк",engine:"Lycoming O-435T, 162 л.с.",speed:"64 км/ч",range:"190 км",crew:"3 человека",armament:"37 мм M6",armorDetails:"6–12 мм",specs:{"Годы":"1943-1944","Масса":"7.4 т","Орудие":"37 мм","Экипаж":"3 чел.","Произведено":"830"},history:"M22 Locust — авиадесантный лёгкий танк для перевозки планерами.",fullHistory:"M22 Locust выпускался с 1943 по 1944 год. Всего было построено 830 машин. Авиадесантный лёгкий танк создавался для перевозки планерами. M22 использовался британцами в операции Varsity (переправа через Рейн) в 1945 году. После войны применялся в различных странах."},
+{id:51,name:"M41 Walker Bulldog",country:"usa",type:"light",wikipedia:"M41 Walker Bulldog",shortDesc:"Лёгкий танк послевоенный",engine:"Continental AOS-895, 500 л.с.",speed:"72 км/ч",range:"160 км",crew:"4 человека",armament:"76 мм M32",armorDetails:"12–32 мм",specs:{"Годы":"1949-1950-е","Масса":"23.5 т","Орудие":"76 мм","Броня":"12-32 мм","Произведено":"5500+"},history:"M41 Walker Bulldog — послевоенный лёгкий танк, участвовал в Корейской войне.",fullHistory:"M41 Walker Bulldog выпускался с 1949 года. Всего было построено более 5500 машин. Послевоенный лёгкий танк с 76-мм орудием участвовал в Корейской войне и поставлялся во множество стран. M41 оставался на вооружении до 1970-х годов."},
+{id:52,name:"T26E3 Pershing",country:"usa",type:"heavy",wikipedia:"M26 Pershing",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/6/66/M26Belgium.jpg/1280px-M26Belgium.jpg",
+ shortDesc:"Тяжёлый танк",engine:"Ford GAF V8, 500 л.с.",speed:"40 км/ч",range:"160 км",crew:"5 человек",armament:"90 мм M3",armorDetails:"19–102 мм",specs:{"Год":"1945","Масса":"41.7 т","Орудие":"90 мм M3","Броня":"до 102 мм","Произведено":"310"},history:"T26E3 — предсерийная версия M26 Pershing. Участвовала в последних боях в Европе.",fullHistory:"T26E3 Pershing выпускался в 1945 году. Всего было построено 310 машин. Предсерийная версия M26 Pershing участвовала в последних боях в Европе, где показала себя эффективной против немецких тяжёлых танков. Боевой дебют T26E3 состоялся в феврале 1945 года под Кёльном."},
+{id:53,name:"M7 Priest",country:"usa",type:"medium",wikipedia:"M7 Priest",shortDesc:"Самоходная гаубица",engine:"Continental R975, 400 л.с.",speed:"39 км/ч",range:"190 км",crew:"7 человек",armament:"105 мм M2A1",armorDetails:"10–30 мм",specs:{"Годы":"1942-1945","Масса":"23 т","Орудие":"105 мм гаубица","Броня":"10-30 мм","Произведено":"4316"},history:"M7 Priest — самоходная артиллерийская установка на базе M3/M4. 105-мм гаубица для поддержки пехоты.",fullHistory:"M7 Priest выпускался с 1942 по 1945 год. Всего было построено 4316 машин. Самоходная артиллерийская установка на базе M3/M4 получила 105-мм гаубицу для поддержки пехоты. M7 активно использовался США и Великобританией. После войны применялся в Корее и других конфликтах."},
+{id:54,name:"M8 Greyhound",country:"usa",type:"light",wikipedia:"M8 Greyhound",shortDesc:"Бронеавтомобиль",engine:"Hercules JXD, 110 л.с.",speed:"89 км/ч",range:"560 км",crew:"4 человека",armament:"37 мм M6",armorDetails:"3–19 мм",specs:{"Годы":"1942-1945","Масса":"7.9 т","Орудие":"37 мм","Колёса":"6×6","Произведено":"8523"},history:"M8 Greyhound — колёсный бронеавтомобиль для разведки.",fullHistory:"M8 Greyhound выпускался с 1942 по 1945 год. Всего было построено 8523 машины. Колёсный бронеавтомобиль 6×6 для разведки с 37-мм орудием был быстрым и манёвренным. M8 активно использовался США и союзниками. После войны применялся в множестве стран."},
+{id:55,name:"M3 Half-track",country:"usa",type:"light",wikipedia:"M3 Half-track",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7c/M3_half_track_9-08-2008_14-47-56.JPG/1280px-M3_half_track_9-08-2008_14-47-56.JPG",
+ shortDesc:"Полугусеничный БТР",engine:"White 160AX, 147 л.с.",speed:"72 км/ч",range:"320 км",crew:"3 + 10 десант",armament:"12.7 мм M2 + 7.62 мм M1919",armorDetails:"6–12 мм",specs:{"Годы":"1940-1944","Масса":"11 т","Экипаж":"13 чел.","Вооружение":"пулемёты","Произведено":"41000+"},history:"M3 Half-track — полугусеничный бронетранспортёр. Широко использовался США и союзниками.",fullHistory:"M3 Half-track выпускался с 1940 по 1944 год. Всего было построено более 41 000 машин. Полугусеничный бронетранспортёр широко использовался США и союзниками для перевозки пехоты, в качестве командирских машин и носителей оружия. M3 активно применялся на всех фронтах Второй мировой войны."},
+{id:56,name:"T34 Calliope",country:"usa",type:"medium",wikipedia:"T34 Calliope",shortDesc:"Ракетный танк",engine:"Continental R975, 400 л.с.",speed:"38 км/ч",range:"190 км",crew:"5 человек",armament:"60 × 114 мм ракет + 75 мм",armorDetails:"12–100 мм",specs:{"Год":"1944","Масса":"38 т","Ракеты":"60×114 мм","База":"M4 Sherman","Произведено":"100+"},history:"T34 Calliope — Sherman с ракетной установкой из 60 труб.",fullHistory:"T34 Calliope был создан в 1944 году. Всего было построено около 100 машин. Sherman с ракетной установкой из 60 труб мог залпом накрыть большую площадь. Однако ракеты были неточными, и после залпа установка часто сбрасывалась. T34 Calliope использовался в конце войны в Европе."},
+{id:57,name:"M4 Sherman DD",country:"usa",type:"medium",wikipedia:"DD tank",shortDesc:"Амфибийный танк",engine:"Continental R975, 400 л.с.",speed:"38 км/ч (на суше)",range:"190 км",crew:"5 человек",armament:"75 мм M3",armorDetails:"12–100 мм",specs:{"Год":"1944","Масса":"33 т","Орудие":"75 мм","Особенность":"Плавучий","Произведено":"700+"},history:"M4 Sherman DD — амфибийный танк для высадки в Нормандии. Складной экран и винты.",fullHistory:"M4 Sherman DD (Duplex Drive) был создан в 1944 году. Всего было построено около 700 машин. Амфибийный танк со складным экраном и винтами предназначался для высадки в Нормандии. Однако в день «Д» большинство DD-танков затонуло из-за высоких волн, и лишь немногие достигли берега."},
+{id:58,name:"M12 GMC",country:"usa",type:"medium",wikipedia:"M12 GMC",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/155_Gun_Motor_Carriage_M12.png/1280px-155_Gun_Motor_Carriage_M12.png",
+ shortDesc:"155-мм самоходка",engine:"Continental R975, 400 л.с.",speed:"39 км/ч",range:"190 км",crew:"6 человек",armament:"155 мм M1917/1918",armorDetails:"10–30 мм",specs:{"Годы":"1942-1943","Масса":"26 т","Орудие":"155 мм GPF","Броня":"10-30 мм","Произведено":"100"},history:"M12 GMC — самоходная 155-мм пушка. Эффективна против укреплений.",fullHistory:"M12 GMC выпускался с 1942 по 1943 год. Всего было построено 100 машин. Самоходная 155-мм пушка была эффективна против укреплений. M12 использовался в Европе в 1944-1945 годах и показал себя мощным оружием поддержки."},
+{id:59,name:"T28 Super Heavy",country:"usa",type:"heavy",wikipedia:"T28 Super Heavy Tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/T28_Super_Heavy_Tank.jpg/1280px-T28_Super_Heavy_Tank.jpg",
+ shortDesc:"Сверхтяжёлый танк",engine:"Ford GAF V8, 500 л.с.",speed:"13 км/ч",range:"160 км",crew:"4 человека",armament:"105 мм T5E1",armorDetails:"до 305 мм",specs:{"Год":"1945","Масса":"86 т","Орудие":"105 мм T5E1","Броня":"до 305 мм","Произведено":"2"},history:"T28 Super Heavy Tank — экспериментальный сверхтяжёлый танк. Огромная броня, но очень медленный.",fullHistory:"T28 Super Heavy Tank был создан в 1945 году в двух экземплярах. Экспериментальный сверхтяжёлый танк с огромной бронёй (до 305 мм) и 105-мм орудием предназначался для прорыва укреплений. Однако масса в 86 тонн и скорость 13 км/ч делали его крайне неповоротливым. Проект был закрыт, но один экземпляр сохранился в музее."},
+{id:60,name:"M2 Light Tank",country:"usa",type:"light",wikipedia:"M2 Light Tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/The_British_Army_in_the_United_Kingdom_1939-45_H17816.jpg/1280px-The_British_Army_in_the_United_Kingdom_1939-45_H17816.jpg",
+ shortDesc:"Лёгкий танк 1930-х",engine:"Continental W-670, 250 л.с.",speed:"58 км/ч",range:"320 км",crew:"4 человека",armament:"37 мм M5",armorDetails:"6–25 мм",specs:{"Годы":"1935-1937","Масса":"9 т","Орудие":"37 мм","Броня":"6-25 мм","Произведено":"94"},history:"M2 Light Tank — американский лёгкий танк 1930-х. Устарел к началу ВМВ.",fullHistory:"M2 Light Tank выпускался с 1935 по 1937 год. Всего было построено 94 машины. Американский лёгкий танк 1930-х с 37-мм орудием устарел к началу Второй мировой войны. M2 использовался в основном как учебный, а его шасси послужило базой для M3 Stuart."},
+
+// ===================== UK =====================
+{id:61,name:"Churchill Mk.VII",country:"uk",type:"heavy",wikipedia:"Churchill tank",shortDesc:"Тяжёлый пехотный танк",engine:"Bedford Twin-Six, 350 л.с.",speed:"20 км/ч",range:"145 км",crew:"5 человек",armament:"75 мм OQF",armorDetails:"16–152 мм",specs:{"Годы":"1941-1945","Масса":"40.7 т","Орудие":"75 мм","Броня":"16-152 мм","Произведено":"5640"},history:"Churchill — британский тяжёлый пехотный танк. Очень толстая броня и отличная проходимость.",fullHistory:"Churchill Mk.VII выпускался с 1941 по 1945 год. Всего было построено 5640 машин. Британский тяжёлый пехотный танк с очень толстой бронёй и отличной проходимостью. Churchill хорошо показал себя в Северной Африке и Европе, особенно в городских боях и на пересечённой местности. На его базе создавались многочисленные специальные машины — мостоукладчики, тральщики, огнемёты (Crocodile)."},
+{id:62,name:"Cromwell Mk.IV",country:"uk",type:"medium",wikipedia:"Cromwell tank",shortDesc:"Крейсерский танк",engine:"Rolls-Royce Meteor, 600 л.с.",speed:"64 км/ч",range:"280 км",crew:"5 человек",armament:"75 мм OQF",armorDetails:"8–76 мм",specs:{"Годы":"1943-1945","Масса":"27.9 т","Скорость":"64 км/ч","Орудие":"75 мм","Произведено":"4016"},history:"Cromwell — британский крейсерский танк. Высокая скорость благодаря двигателю Rolls-Royce Meteor.",fullHistory:"Cromwell Mk.IV выпускался с 1943 по 1945 год. Всего было построено 4016 машин. Британский крейсерский танк с высокой скоростью благодаря двигателю Rolls-Royce Meteor. Cromwell хорошо показал себя в Европе в 1944-1945 годах, но его 75-мм орудие уступало немецким. После войны использовался в различных странах."},
+{id:63,name:"Matilda II",country:"uk",type:"medium",wikipedia:"Matilda II",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Iwm092.jpg",
+ shortDesc:"Пехотный танк «Королева пустыни»",engine:"2 × AEC diesel, 190 л.с.",speed:"24 км/ч",range:"130 км",crew:"4 человека",armament:"40 мм QF 2-pdr / 76 мм OQF",armorDetails:"20–78 мм",specs:{"Годы":"1938-1942","Масса":"26.9 т","Орудие":"40/57 мм","Броня":"20-78 мм","Произведено":"2987"},history:"Matilda II — британский пехотный танк. Очень толстая броня для своего времени. «Королева пустыни».",fullHistory:"Matilda II выпускался с 1938 по 1942 год. Всего было построено 2987 машин. Британский пехотный танк с очень толстой бронёй для своего времени получил прозвище «Королева пустыни» за успехи в Северной Африке. Matilda II был практически неуязвим для итальянских и большинства немецких орудий того времени. Однако его 40-мм орудие было слабым, а скорость — низкой."},
+{id:64,name:"Sherman Firefly",country:"uk",type:"medium",wikipedia:"Sherman Firefly",shortDesc:"Sherman с 17-фунтовкой",engine:"Continental R975, 400 л.с.",speed:"38 км/ч",range:"190 км",crew:"4 человека",armament:"76.2 мм OQF 17-pdr",armorDetails:"12–100 мм",specs:{"Годы":"1944-1945","Масса":"35 т","Орудие":"76.2 мм 17-pdr","Броня":"12-100 мм","Произведено":"2100"},history:"Sherman Firefly — британская модификация M4 Sherman с мощным 17-фунтовым орудием.",fullHistory:"Sherman Firefly выпускался с 1944 по 1945 год. Всего было построено около 2100 машин. Британская модификация M4 Sherman с мощным 17-фунтовым орудием стала эффективным средством борьбы с немецкими Tiger и Panther. Firefly был единственным западным танком, способным пробить лобовую броню Tiger II на дистанции боя. Однако длинное орудие делало машину заметной и неудобной в городских боях."},
+{id:65,name:"Comet",country:"uk",type:"medium",wikipedia:"Comet tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e6/Comet_Type_A.jpg/1280px-Comet_Type_A.jpg",
+ shortDesc:"Крейсерский танк",engine:"Rolls-Royce Meteor, 600 л.с.",speed:"51 км/ч",range:"250 км",crew:"5 человек",armament:"77 мм OQF",armorDetails:"14–102 мм",specs:{"Годы":"1944-1945","Масса":"33 т","Орудие":"77 мм","Броня":"14-102 мм","Произведено":"1200"},history:"Comet — последний британский крейсерский танк войны. Улучшенный Cromwell с 77-мм орудием.",fullHistory:"Comet выпускался с 1944 по 1945 год. Всего было построено около 1200 машин. Последний британский крейсерский танк войны стал улучшенным Cromwell с 77-мм орудием. Comet хорошо показал себя в Европе в конце войны и после неё использовался в различных странах."},
+{id:66,name:"Valentine",country:"uk",type:"medium",wikipedia:"Valentine tank",shortDesc:"Пехотный танк",engine:"AEC diesel, 131 л.с.",speed:"24 км/ч",range:"145 км",crew:"3 человека",armament:"40 мм QF 2-pdr / 75 мм",armorDetails:"8–65 мм",specs:{"Годы":"1940-1944","Масса":"16-17 т","Орудие":"40/57/75 мм","Броня":"8-65 мм","Произведено":"8275"},history:"Valentine — британский пехотный танк. Широко поставлялся СССР по ленд-лизу.",fullHistory:"Valentine выпускался с 1940 по 1944 год. Всего было построено 8275 машин. Британский пехотный танк с надёжной конструкцией широко поставлялся СССР по ленд-лизу. Valentine был популярен среди советских танкистов за простоту и надёжность. После войны использовался в различных странах."},
+{id:67,name:"Crusader",country:"uk",type:"medium",wikipedia:"Crusader tank",shortDesc:"Крейсерский танк",engine:"Nuffield Liberty, 340 л.с.",speed:"43 км/ч",range:"320 км",crew:"4 человека",armament:"40 мм QF 2-pdr / 57 мм",armorDetails:"7–49 мм",specs:{"Годы":"1941-1943","Масса":"19.3 т","Скорость":"43 км/ч","Орудие":"40/57 мм","Произведено":"5300"},history:"Crusader — британский крейсерский танк Северной Африки. Быстрый, но ненадёжный.",fullHistory:"Crusader выпускался с 1941 по 1943 год. Всего было построено около 5300 машин. Британский крейсерский танк Северной Африки был быстрым, но ненадёжным. Crusader участвовал в битве при Эль-Аламейне и показал себя с лучшей стороны в манёвренных боях, но страдал от технических проблем."},
+{id:68,name:"Covenanter",country:"uk",type:"medium",wikipedia:"Covenanter tank",shortDesc:"Крейсерский танк",engine:"Nuffield Liberty, 340 л.с.",speed:"50 км/ч",range:"240 км",crew:"4 человека",armament:"40 мм QF 2-pdr",armorDetails:"7–40 мм",specs:{"Годы":"1940-1942","Масса":"18 т","Орудие":"40 мм","Произведено":"1771"},history:"Covenanter — британский крейсерский танк. Проблемы с охлаждением двигателя не позволили использовать его в боях.",fullHistory:"Covenanter выпускался с 1940 по 1942 год. Всего было построено 1771 машина. Британский крейсерский танк с проблемами охлаждения двигателя не использовался в боях и применялся только как учебный."},
+{id:69,name:"Centurion Mk.I",country:"uk",type:"medium",wikipedia:"Centurion tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/Dutch_Centurion_Mk_5-1_with_Monowheel_Trailer_Camouflaged_RHPA_1965.jpg/1280px-Dutch_Centurion_Mk_5-1_with_Monowheel_Trailer_Camouflaged_RHPA_1965.jpg",
+ shortDesc:"Первый ОБТ",engine:"Rolls-Royce Meteor, 650 л.с.",speed:"35 км/ч",range:"190 км",crew:"4 человека",armament:"76.2 мм OQF 17-pdr",armorDetails:"14–152 мм",specs:{"Год":"1945","Масса":"52 т","Орудие":"76.2 мм 17-pdr","Броня":"14-152 мм","Произведено":"6"},history:"Centurion — первый британский танк, появившийся в конце войны. Стал первым основным боевым танком (ОБТ).",fullHistory:"Centurion Mk.I был создан в 1945 году в шести экземплярах. Первый британский танк, появившийся в конце войны, стал первым основным боевым танком (ОБТ). Centurion не успел повоевать во Второй мировой, но впоследствии стал одним из самых успешных танков в истории, участвуя в Корейской войне и множестве других конфликтов."},
+{id:70,name:"Black Prince",country:"uk",type:"heavy",wikipedia:"Black Prince (tank)",shortDesc:"Тяжёлый Churchill",engine:"Bedford Twin-Six, 350 л.с.",speed:"18 км/ч",range:"160 км",crew:"5 человек",armament:"76.2 мм OQF 17-pdr",armorDetails:"до 178 мм",specs:{"Год":"1945","Масса":"50 т","Орудие":"76.2 мм 17-pdr","Броня":"до 178 мм","Произведено":"6"},history:"Black Prince (A43) — тяжёлая версия Churchill с 17-фунтовым орудием. Появился слишком поздно.",fullHistory:"Black Prince (A43) был создан в 1945 году в шести экземплярах. Тяжёлая версия Churchill с 17-фунтовым орудием и усиленной бронёй появилась слишком поздно для участия в войне. Масса в 50 тонн и скорость 18 км/ч делали его крайне неповоротливым. Проект был закрыт после войны."},
+{id:71,name:"Excelsior",country:"uk",type:"heavy",wikipedia:"Excelsior tank",shortDesc:"Экспериментальный тяжёлый",engine:"Rolls-Royce Meteor, 600 л.с.",speed:"24 км/ч",range:"160 км",crew:"5 человек",armament:"57 мм OQF 6-pdr",armorDetails:"до 114 мм",specs:{"Год":"1943","Масса":"45 т","Орудие":"57 мм","Броня":"до 114 мм","Произведено":"1"},history:"Excelsior — экспериментальный тяжёлый танк на базе Churchill.",fullHistory:"Excelsior был создан в 1943 году в одном экземпляре. Экспериментальный тяжёлый танк на базе Churchill с улучшенной подвеской не пошёл в серию из-за сложности и дороговизны."},
+{id:72,name:"Archer",country:"uk",type:"medium",wikipedia:"Archer (tank destroyer)",shortDesc:"ПТ-САУ",engine:"GMC 6-71, 165 л.с.",speed:"32 км/ч",range:"230 км",crew:"4 человека",armament:"76.2 мм OQF 17-pdr",armorDetails:"8–20 мм",specs:{"Годы":"1944-1945","Масса":"17 т","Орудие":"76.2 мм 17-pdr","Произведено":"665"},history:"Archer — британская ПТ-САУ на базе Valentine с 17-фунтовым орудием. Орудие направлено назад.",fullHistory:"Archer выпускался с 1944 по 1945 год. Всего было построено 665 машин. Британская ПТ-САУ на базе Valentine с 17-фунтовым орудием, направленным назад. Такая компоновка позволяла быстро покидать позицию после выстрела. Archer хорошо показал себя в Европе в конце войны."},
+{id:73,name:"Achilles",country:"uk",type:"medium",wikipedia:"Achilles (tank destroyer)",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/M10_%2817pdr%29_Achilles_Ic_%2835807817713%29.jpg/1280px-M10_%2817pdr%29_Achilles_Ic_%2835807817713%29.jpg",
+ shortDesc:"M10 с 17-фунтовкой",engine:"General Motors 6046, 375 л.с.",speed:"48 км/ч",range:"300 км",crew:"5 человек",armament:"76.2 мм OQF 17-pdr",armorDetails:"7–38 мм",specs:{"Годы":"1944-1945","Масса":"29 т","Орудие":"76.2 мм 17-pdr","Произведено":"1100"},history:"Achilles — британская модификация американской M10 Wolverine с 17-фунтовым орудием.",fullHistory:"Achilles выпускался с 1944 по 1945 год. Всего было построено около 1100 машин. Британская модификация американской M10 Wolverine с 17-фунтовым орудием стала мощной ПТ-САУ, способной бороться с тяжёлыми немецкими танками. Achilles активно использовался в Европе в конце войны."},
+{id:74,name:"Tetrarch",country:"uk",type:"light",wikipedia:"Light Tank Mk VII Tetrarch",shortDesc:"Лёгкий авиадесантный",engine:"Henry Meadows, 165 л.с.",speed:"64 км/ч",range:"225 км",crew:"3 человека",armament:"40 мм QF 2-pdr",armorDetails:"4–14 мм",specs:{"Годы":"1940-1942","Масса":"7.6 т","Орудие":"40 мм","Произведено":"177"},history:"Tetrarch — британский лёгкий танк для воздушно-десантных войск. Перевозился планерами Hamilcar.",fullHistory:"Tetrarch выпускался с 1940 по 1942 год. Всего было построено 177 машин. Британский лёгкий танк для воздушно-десантных войск перевозился планерами Hamilcar. Tetrarch использовался в операции «Тонга» в день «Д» и в других десантных операциях."},
+{id:76,name:"Cromwell Command",country:"uk",type:"medium",wikipedia:"Cromwell tank",shortDesc:"Командирский Cromwell",engine:"Rolls-Royce Meteor, 600 л.с.",speed:"64 км/ч",range:"280 км",crew:"5 человек",armament:"нет (доп. радио)",armorDetails:"8–76 мм",specs:{"Год":"1944","Масса":"27 т","Орудие":"нет","Особенность":"Доп. радио","Произведено":"300+"},history:"Cromwell Command — командирская версия Cromwell без башенного орудия для размещения дополнительного радиооборудования.",fullHistory:"Cromwell Command выпускался в 1944 году. Всего было построено около 300 машин. Командирская версия Cromwell без башенного орудия для размещения дополнительного радиооборудования использовалась в штабах танковых бригад."},
+{id:77,name:"Churchill AVRE",country:"uk",type:"heavy",wikipedia:"Armoured Vehicle Royal Engineers",shortDesc:"Инженерный танк",engine:"Bedford Twin-Six, 350 л.с.",speed:"20 км/ч",range:"145 км",crew:"6 человек",armament:"290 мм Petard",armorDetails:"16–152 мм",specs:{"Годы":"1943-1945","Масса":"40 т","Орудие":"290 мм мортира","Произведено":"200+"},history:"Churchill AVRE — инженерный танк с 290-мм мортирой Petard для разрушения укреплений.",fullHistory:"Churchill AVRE выпускался с 1943 по 1945 год. Всего было построено около 200 машин. Инженерный танк с 290-мм мортирой Petard для разрушения укреплений активно использовался в день «Д» и в Европе. AVRE стал символом британских инженерных войск."},
+{id:78,name:"Matilda Hedgehog",country:"uk",type:"medium",wikipedia:"Matilda II",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Puckapunyal-Matilda-Hedgehog-1.jpg",
+ shortDesc:"Экспериментальный миномётный танк",engine:"2 × AEC diesel, 190 л.с.",speed:"24 км/ч",range:"130 км",crew:"4 человека",armament:"7 × 120 мм миномёта Hedgehog",armorDetails:"20–78 мм",specs:{"Год":"1944","Масса":"27 т","Орудие":"7×120 мм миномёты","Произведено":"1"},history:"Matilda Hedgehog — экспериментальный Matilda с миномётами для подрыва мин.",fullHistory:"Matilda Hedgehog был создан в 1944 году в одном экземпляре. Экспериментальный Matilda с семью 120-мм миномётами Hedgehog для подрыва мин не пошёл в серию."},
+{id:79,name:"Valiant",country:"uk",type:"medium",wikipedia:"Valiant tank",shortDesc:"Пехотный танк",engine:"GMC diesel, 210 л.с.",speed:"32 км/ч",range:"160 км",crew:"4 человека",armament:"57 мм OQF 6-pdr",armorDetails:"до 114 мм",specs:{"Год":"1944","Масса":"27 т","Орудие":"57 мм","Произведено":"1"},history:"Valiant — экспериментальный пехотный танк с наклонной бронёй.",fullHistory:"Valiant был создан в 1944 году в одном экземпляре. Экспериментальный пехотный танк с наклонной бронёй и 57-мм орудием не пошёл в серию из-за плохой проходимости."},
+{id:80,name:"TOG II",country:"uk",type:"heavy",wikipedia:"TOG II",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/5/56/TOG_2_front-left_2017_Bovington.jpg/1280px-TOG_2_front-left_2017_Bovington.jpg",
+ shortDesc:"Сверхтяжёлый танк",engine:"Paxman diesel, 600 л.с.",speed:"14 км/ч",range:"80 км",crew:"8 человек",armament:"76.2 мм OQF 17-pdr",armorDetails:"до 114 мм",specs:{"Год":"1941","Масса":"80 т","Орудие":"76.2 мм","Произведено":"1"},history:"TOG II — экспериментальный сверхтяжёлый танк для условий Первой мировой.",fullHistory:"TOG II был создан в 1941 году в одном экземпляре. Экспериментальный сверхтяжёлый танк для условий Первой мировой войны оказался слишком большим и медленным. Проект был закрыт, но TOG II сохранился в музее Бовингтона."},
+
+// ===================== FRANCE =====================
+{id:81,name:"Char B1 bis",country:"france",type:"heavy",wikipedia:"Char B1",shortDesc:"Тяжёлый танк",engine:"Renault 6-cyl, 307 л.с.",speed:"28 км/ч",range:"200 км",crew:"4 человека",armament:"75 мм SA35 + 47 мм SA35",armorDetails:"до 60 мм",specs:{"Годы":"1937-1940","Масса":"31.5 т","Орудия":"75 мм + 47 мм","Броня":"до 60 мм","Произведено":"403"},history:"Char B1 bis — французский тяжёлый танк. Два орудия в разных башнях, очень толстая броня.",fullHistory:"Char B1 bis выпускался с 1937 по 1940 год. Всего было построено 403 машины. Французский тяжёлый танк с двумя орудиями в разных башнях и очень толстой бронёй был грозным противником в 1940 году. Однако он страдал от тесной башни (один человек) и высокого расхода топлива. Многие B1 bis были захвачены немцами и использовались как учебные и огнемётные машины."},
+{id:82,name:"Char D2",country:"france",type:"medium",wikipedia:"Char D2",shortDesc:"Средний танк",engine:"Renault, 150 л.с.",speed:"23 км/ч",range:"140 км",crew:"3 человека",armament:"47 мм SA35",armorDetails:"20–50 мм",specs:{"Годы":"1936-1940","Масса":"22 т","Орудие":"47 мм","Броня":"20-50 мм","Произведено":"100"},history:"Char D2 — французский средний танк. Улучшенная версия D1.",fullHistory:"Char D2 выпускался с 1936 по 1940 год. Всего было построено 100 машин. Французский средний танк стал улучшенной версией D1 с 47-мм орудием и усиленной бронёй. D2 использовался в 1940 году и показал себя с лучшей стороны."},
+{id:83,name:"Somua S35",country:"france",type:"medium",wikipedia:"Somua S35",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/SOMUA-S35-Aberdeen.0007qkq1.jpg/1280px-SOMUA-S35-Aberdeen.0007qkq1.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Кавалерийский танк",engine:"Somua V8, 190 л.с.",speed:"40 км/ч",range:"230 км",crew:"3 человека",armament:"47 мм SA35",armorDetails:"20–55 мм",specs:{"Годы":"1936-1940","Масса":"20 т","Орудие":"47 мм","Броня":"20-55 мм","Произведено":"430"},history:"Somua S35 — французский кавалерийский танк. Один из лучших французских танков 1940 года.",fullHistory:"Somua S35 выпускался с 1936 по 1940 год. Всего было построено 430 машин. Французский кавалерийский танк с 47-мм орудием и литой бронёй считался одним из лучших французских танков 1940 года. Однако тесная башня и отсутствие радиостанции ограничивали его эффективность."},
+{id:84,name:"Char R35",country:"france",type:"light",wikipedia:"Renault R35",shortDesc:"Лёгкий пехотный танк",engine:"Renault V4, 82 л.с.",speed:"20 км/ч",range:"130 км",crew:"2 человека",armament:"37 мм SA18",armorDetails:"10–40 мм",specs:{"Годы":"1936-1940","Масса":"10.6 т","Орудие":"37 мм","Броня":"10-40 мм","Произведено":"1070"},history:"Char R35 — французский лёгкий пехотный танк. Самый массовый французский танк 1940 года.",fullHistory:"Char R35 выпускался с 1936 по 1940 год. Всего было построено 1070 машин. Французский лёгкий пехотный танк с 37-мм орудием был самым массовым французским танком 1940 года. R35 использовался в боях 1940 года, а после капитуляции Франции — в немецкой армии."},
+{id:85,name:"Char H35/H39",country:"france",type:"light",wikipedia:"Hotchkiss H35",shortDesc:"Лёгкий кавалерийский",engine:"Hotchkiss 6-cyl, 120 л.с.",speed:"28 км/ч",range:"150 км",crew:"2 человека",armament:"37 мм SA18 / SA38",armorDetails:"15–40 мм",specs:{"Годы":"1936-1940","Масса":"11.4 т","Орудие":"37 мм","Броня":"15-40 мм","Произведено":"1000+"},history:"Char H35/H39 — французский лёгкий танк кавалерии. Широко использовался в 1940 году.",fullHistory:"Char H35/H39 выпускался с 1936 по 1940 год. Всего было построено более 1000 машин. Французский лёгкий танк кавалерии с 37-мм орудием широко использовался в 1940 году. H39 получил более мощное орудие SA38 и усиленную броню."},
+{id:86,name:"AMR 33/35",country:"france",type:"light",wikipedia:"AMR 33",shortDesc:"Разведывательный танк",engine:"Renault, 84 л.с.",speed:"60 км/ч",range:"200 км",crew:"2 человека",armament:"7.5 мм / 13.2 мм пулемёт",armorDetails:"5–13 мм",specs:{"Годы":"1933-1935","Масса":"5-6 т","Орудие":"7.5/13.2 мм","Произведено":"200+"},history:"AMR 33/35 — французский разведывательный танк. Лёгкий и быстрый, но слабо вооружён.",fullHistory:"AMR 33/35 выпускался с 1933 по 1935 год. Всего было построено более 200 машин. Французский разведывательный танк был лёгким и быстрым, но слабо вооружённым — только пулемёты. AMR использовался в кавалерийских частях в 1940 году."},
+{id:87,name:"Char 2C",country:"france",type:"heavy",wikipedia:"Char 2C",shortDesc:"Сверхтяжёлый танк",engine:"2 × Mercedes, 520 л.с.",speed:"15 км/ч",range:"150 км",crew:"12 человек",armament:"75 мм + несколько пулемётов",armorDetails:"до 45 мм",specs:{"Годы":"1921","Масса":"69 т","Орудие":"75 мм + пулемёты","Экипаж":"12 чел.","Произведено":"10"},history:"Char 2C — французский сверхтяжёлый танк Первой мировой. Самый большой танк своего времени.",fullHistory:"Char 2C выпускался в 1921 году. Всего было построено 10 машин. Французский сверхтяжёлый танк Первой мировой войны был самым большим танком своего времени. К 1940 году устарел, но использовался для пропаганды. Большинство машин было уничтожено или захвачено в 1940 году."},
+{id:88,name:"Renault FT",country:"france",type:"light",wikipedia:"Renault FT",shortDesc:"Первый современный танк",engine:"Renault 4-cyl, 39 л.с.",speed:"7 км/ч",range:"60 км",crew:"2 человека",armament:"37 мм Puteaux / 8 мм пулемёт",armorDetails:"8–22 мм",specs:{"Годы":"1917-1920-е","Масса":"6.5 т","Орудие":"37 мм/пулемёт","Произведено":"3700+"},history:"Renault FT — первый в мире танк классической компоновки (башня сверху).",fullHistory:"Renault FT выпускался с 1917 года. Всего было построено более 3700 машин. Первый в мире танк классической компоновки (башня сверху) стал революцией в танкостроении. Renault FT участвовал в Первой мировой войне и использовался в множестве стран до 1940-х годов."},
+{id:89,name:"Char Saint-Chamond",country:"france",type:"heavy",wikipedia:"Char Saint-Chamond",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/St._Chamond.jpg/1280px-St._Chamond.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Танк Первой мировой",engine:"Panhard, 90 л.с.",speed:"12 км/ч",range:"60 км",crew:"9 человек",armament:"75 мм",armorDetails:"11–17 мм",specs:{"Годы":"1917-1918","Масса":"23 т","Орудие":"75 мм","Произведено":"253"},history:"Char Saint-Chamond — французский тяжёлый танк Первой мировой. Плохая проходимость из-за длинного корпуса.",fullHistory:"Char Saint-Chamond выпускался с 1917 по 1918 год. Всего было построено 253 машины. Французский тяжёлый танк Первой мировой войны с 75-мм орудием страдал от плохой проходимости из-за длинного корпуса. Saint-Chamond участвовал в боях 1917-1918 годов."},
+{id:90,name:"Char Schneider CA1",country:"france",type:"heavy",wikipedia:"Schneider CA1",shortDesc:"Первый французский танк",engine:"Schneider, 60 л.с.",speed:"8 км/ч",range:"80 км",crew:"6 человек",armament:"75 мм",armorDetails:"11–19 мм",specs:{"Годы":"1916-1917","Масса":"14 т","Орудие":"75 мм","Произведено":"400"},history:"Schneider CA1 — первый французский серийный танк. Участвовал в Первой мировой.",fullHistory:"Schneider CA1 выпускался с 1916 по 1917 год. Всего было построено 400 машин. Первый французский серийный танк с 75-мм орудием участвовал в Первой мировой войне. Schneider CA1 показал себя в боях, но страдал от тесноты и плохой проходимости."},
+
+// ===================== ITALY =====================
+{id:91,name:"P26/40",country:"italy",type:"heavy",wikipedia:"P26/40 tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/P26-40_tank.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/P40_Italy.jpg",
+ shortDesc:"Тяжёлый танк",engine:"V-12 SPA 242, 330 л.с.",speed:"40 км/ч",range:"280 км",crew:"4 человека",armament:"75 мм Cannone da 75/34",armorDetails:"14–50 мм",specs:{"Годы":"1943-1945","Масса":"26 т","Орудие":"75 мм","Броня":"14-50 мм","Произведено":"120"},history:"P26/40 — итальянский тяжёлый танк. Самый мощный итальянский танк войны.",fullHistory:"P26/40 выпускался с 1943 по 1945 год. Всего было построено 120 машин. Итальянский тяжёлый танк с 75-мм орудием стал самым мощным итальянским танком войны. После капитуляции Италии часть машин использовалась немцами под обозначением Panzer P40 737(i)."},
+{id:92,name:"M15/42",country:"italy",type:"medium",wikipedia:"M15/42 tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/M15_42_Saumur_01.jpg",
+ shortDesc:"Средний танк",engine:"SPA 15TB, 145 л.с.",speed:"38 км/ч",range:"200 км",crew:"4 человека",armament:"47 мм Cannone da 47/40",armorDetails:"6–50 мм",specs:{"Годы":"1942-1943","Масса":"15 т","Орудие":"47 мм","Броня":"6-50 мм","Произведено":"220"},history:"M15/42 — последний итальянский средний танк. Улучшенный M14/41 с новым двигателем.",fullHistory:"M15/42 выпускался с 1942 по 1943 год. Всего было построено 220 машин. Последний итальянский средний танк стал улучшенным M14/41 с новым двигателем и более мощным орудием. После капитуляции Италии часть машин использовалась немцами."},
+{id:93,name:"M14/41",country:"italy",type:"medium",wikipedia:"M14/41 tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/M14_41_Medium_Tank.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/M14-41_Italy.jpg",
+ shortDesc:"Средний танк",engine:"SPA 15TB, 145 л.с.",speed:"32 км/ч",range:"200 км",crew:"4 человека",armament:"47 мм Cannone da 47/32",armorDetails:"6–42 мм",specs:{"Годы":"1941-1942","Масса":"14.5 т","Орудие":"47 мм","Броня":"6-42 мм","Произведено":"752"},history:"M14/41 — итальянский средний танк Северной Африки. Основной итальянский танк 1941-1942 годов.",fullHistory:"M14/41 выпускался с 1941 по 1942 год. Всего было построено 752 машины. Итальянский средний танк Северной Африки был основным итальянским танком 1941-1942 годов. M14/41 страдал от слабой брони и ненадёжного двигателя в пустыне."},
+{id:94,name:"M13/40",country:"italy",type:"medium",wikipedia:"M13/40 tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Italian_M13-40_tank_in_the_desert_1942.jpg",
+ shortDesc:"Средний танк",engine:"SPA 8T, 125 л.с.",speed:"32 км/ч",range:"200 км",crew:"4 человека",armament:"47 мм Cannone da 47/32",armorDetails:"6–42 мм",specs:{"Годы":"1940-1941","Масса":"14 т","Орудие":"47 мм","Броня":"6-42 мм","Произведено":"710"},history:"M13/40 — основной итальянский средний танк Северной Африки.",fullHistory:"M13/40 выпускался с 1940 по 1941 год. Всего было построено 710 машин. Основной итальянский средний танк Северной Африки с 47-мм орудием страдал от слабой брони и ненадёжного двигателя. M13/40 участвовал в боях в Ливии и Египте."},
+{id:95,name:"M11/39",country:"italy",type:"medium",wikipedia:"M11/39 tank",shortDesc:"Средний танк",engine:"SPA 8T, 105 л.с.",speed:"32 км/ч",range:"200 км",crew:"3 человека",armament:"37 мм Vickers-Terni + 2×8 мм пулемёта",armorDetails:"6–30 мм",specs:{"Годы":"1939-1940","Масса":"11 т","Орудие":"37 мм","Броня":"6-30 мм","Произведено":"105"},history:"M11/39 — итальянский средний танк. 37-мм орудие в корпусе, пулемёт в башне.",fullHistory:"M11/39 выпускался с 1939 по 1940 год. Всего было построено 105 машин. Итальянский средний танк с 37-мм орудием в корпусе и пулемётом в башне был устаревшим уже к началу войны. M11/39 участвовал в боях в Северной Африке и был быстро вытеснен более современными машинами."},
+{id:96,name:"L6/40",country:"italy",type:"light",wikipedia:"L6/40 tank",shortDesc:"Лёгкий танк",engine:"SPA 18D, 70 л.с.",speed:"42 км/ч",range:"200 км",crew:"2 человека",armament:"20 мм Breda 35",armorDetails:"6–40 мм",specs:{"Годы":"1940-1943","Масса":"6.8 т","Орудие":"20 мм","Броня":"6-40 мм","Произведено":"282"},history:"L6/40 — итальянский лёгкий танк. Использовался для разведки и поддержки пехоты.",fullHistory:"L6/40 выпускался с 1940 по 1943 год. Всего было построено 282 машины. Итальянский лёгкий танк с 20-мм автоматической пушкой использовался для разведки и поддержки пехоты. L6/40 участвовал в боях в Северной Африке, на Балканах и в Италии."},
+{id:97,name:"L3/35",country:"italy",type:"light",wikipedia:"L3/35",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/L-35-Beograd.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/L3_35_Italy.jpg",
+ shortDesc:"Танкетка",engine:"Fiat-SPA CV3, 43 л.с.",speed:"42 км/ч",range:"125 км",crew:"2 человека",armament:"2 × 8 мм Fiat-Revelli",armorDetails:"6–14 мм",specs:{"Годы":"1935-1943","Масса":"3.5 т","Орудие":"2×8 мм пулемёта","Экипаж":"2 чел.","Произведено":"1395"},history:"L3/35 — итальянская танкетка. Самая массовая итальянская бронемашина.",fullHistory:"L3/35 выпускался с 1935 по 1943 год. Всего было построено 1395 машин. Итальянская танкетка с двумя пулемётами была самой массовой итальянской бронемашиной. L3/35 участвовал в войне в Эфиопии, Испании и Второй мировой, но к 1940 году устарел."},
+{id:98,name:"L3/33",country:"italy",type:"light",wikipedia:"L3/33",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Carro_Veloce_L3_33.jpg",
+ shortDesc:"Танкетка",engine:"Fiat-SPA CV3, 43 л.с.",speed:"42 км/ч",range:"125 км",crew:"2 человека",armament:"2 × 6.5 мм Fiat-Revelli",armorDetails:"6–14 мм",specs:{"Годы":"1933-1935","Масса":"3.2 т","Орудие":"2×6.5 мм пулемёта","Произведено":"930"},history:"L3/33 — ранняя версия итальянской танкетки.",fullHistory:"L3/33 выпускался с 1933 по 1935 год. Всего было построено 930 машин. Ранняя версия итальянской танкетки с двумя 6.5-мм пулемётами участвовала в войне в Эфиопии и Испании."},
+{id:99,name:"Semovente da 75/18",country:"italy",type:"medium",wikipedia:"Semovente da 75/18",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Semovente_M42.Saumur.0008fefh.jpg",
+ shortDesc:"САУ",engine:"SPA 15TB, 145 л.с.",speed:"32 км/ч",range:"200 км",crew:"3 человека",armament:"75 мм Obice da 75/18",armorDetails:"6–50 мм",specs:{"Годы":"1941-1943","Масса":"15 т","Орудие":"75 мм гаубица","Броня":"6-50 мм","Произведено":"300+"},history:"Semovente da 75/18 — итальянская САУ на базе M13/M14/M15. Самая успешная итальянская САУ.",fullHistory:"Semovente da 75/18 выпускалась с 1941 по 1943 год. Всего было построено более 300 машин. Итальянская САУ на базе M13/M14/M15 с 75-мм гаубицей была самой успешной итальянской САУ. После капитуляции Италии часть машин использовалась немцами."},
+{id:100,name:"Semovente da 90/53",country:"italy",type:"medium",wikipedia:"Semovente da 90/53",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Semovente_90-53.jpg",
+ shortDesc:"Противотанковая САУ",engine:"SPA 15TB, 145 л.с.",speed:"32 км/ч",range:"200 км",crew:"4 человека",armament:"90 мм Cannone da 90/53",armorDetails:"6–30 мм",specs:{"Годы":"1941-1943","Масса":"16 т","Орудие":"90 мм","Произведено":"60"},history:"Semovente da 90/53 — итальянская ПТ-САУ с 90-мм зенитным орудием.",fullHistory:"Semovente da 90/53 выпускалась с 1941 по 1943 год. Всего было построено 60 машин. Итальянская ПТ-САУ с 90-мм зенитным орудием была мощной, но открытая рубка делала экипаж уязвимым."},
+{id:101,name:"Semovente da 105/25",country:"italy",type:"medium",wikipedia:"Semovente da 105/25",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Semovente_105_25.jpg",
+ shortDesc:"Штурмовая САУ",engine:"SPA 15TB, 145 л.с.",speed:"35 км/ч",range:"200 км",crew:"3 человека",armament:"105 мм Obice da 105/25",armorDetails:"6–50 мм",specs:{"Годы":"1943","Масса":"16 т","Орудие":"105 мм гаубица","Произведено":"60"},history:"Semovente da 105/25 — итальянская штурмовая САУ.",fullHistory:"Semovente da 105/25 выпускалась в 1943 году. Всего было построено 60 машин. Итальянская штурмовая САУ с 105-мм гаубицей использовалась немцами после капитуляции Италии."},
+{id:102,name:"Fiat 3000",country:"italy",type:"light",wikipedia:"Fiat 3000",shortDesc:"Первый итальянский танк",engine:"Fiat, 50 л.с.",speed:"21 км/ч",range:"95 км",crew:"2 человека",armament:"37 мм / 8 мм пулемёт",armorDetails:"6–16 мм",specs:{"Годы":"1921-1930","Масса":"5.5 т","Орудие":"37 мм/пулемёты","Произведено":"150"},history:"Fiat 3000 — первый итальянский серийный танк на базе Renault FT.",fullHistory:"Fiat 3000 выпускался с 1921 по 1930 год. Всего было построено 150 машин. Первый итальянский серийный танк на базе Renault FT участвовал в войне в Эфиопии и Испании."},
+{id:103,name:"AB 41",country:"italy",type:"light",wikipedia:"AB 41",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Spa43.jpg/1280px-Spa43.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Бронеавтомобиль",engine:"SPA 18D, 80 л.с.",speed:"78 км/ч",range:"400 км",crew:"4 человека",armament:"20 мм Breda 35",armorDetails:"8–18 мм",specs:{"Годы":"1941-1943","Масса":"6.5 т","Орудие":"20 мм","Колёса":"4×4","Произведено":"550"},history:"AB 41 — итальянский бронеавтомобиль. Хорошая машина для разведки в Северной Африке.",fullHistory:"AB 41 выпускался с 1941 по 1943 год. Всего было построено 550 машин. Итальянский бронеавтомобиль с 20-мм пушкой был хорошей машиной для разведки в Северной Африке."},
+{id:104,name:"Sahariano",country:"italy",type:"medium",wikipedia:"Carro Armato Celere Sahariano",shortDesc:"Пустынный танк",engine:"SPA 15TB, 145 л.с.",speed:"55 км/ч",range:"300 км",crew:"4 человека",armament:"47 мм Cannone da 47/40",armorDetails:"20–50 мм",specs:{"Год":"1943","Масса":"22 т","Орудие":"47 мм","Произведено":"24"},history:"Carro Armato Celere Sahariano — итальянский танк для Северной Африки.",fullHistory:"Carro Armato Celere Sahariano был создан в 1943 году в 24 экземплярах. Итальянский танк для Северной Африки с 47-мм орудием не успел повоевать из-за капитуляции Италии."},
+{id:106,name:"Semovente da 47/32",country:"italy",type:"light",wikipedia:"Semovente da 47/32",shortDesc:"Лёгкая САУ",engine:"SPA 18D, 70 л.с.",speed:"42 км/ч",range:"200 км",crew:"3 человека",armament:"47 мм Cannone da 47/32",armorDetails:"6–30 мм",specs:{"Годы":"1941-1943","Масса":"7 т","Орудие":"47 мм","Произведено":"150+"},history:"Semovente da 47/32 — лёгкая итальянская САУ на базе L6/40.",fullHistory:"Semovente da 47/32 выпускалась с 1941 по 1943 год. Всего было построено более 150 машин. Лёгкая итальянская САУ на базе L6/40 с 47-мм орудием использовалась как ПТ-САУ."},
+{id:107,name:"L3 CC",country:"italy",type:"light",wikipedia:"L3/35",
+ image:"https://i.pinimg.com/736x/17/19/32/171932d4827f3ec6bb81f3afec4b5e0a.jpg",
+ wtImage:"https://tanks-encyclopedia.com/wp-content/uploads/2016/05/L3_CC.jpg",
+ shortDesc:"Танкетка с 20-мм пушкой",engine:"Fiat-SPA CV3, 43 л.с.",speed:"42 км/ч",range:"125 км",crew:"2 человека",armament:"20 мм Solothurn S-18/1000",armorDetails:"6–14 мм",specs:{"Годы":"1938-1943","Масса":"3.5 т","Орудие":"20 мм","Произведено":"100+"},history:"L3 CC (Controcarro) — модификация L3 с 20-мм противотанковой пушкой.",fullHistory:"L3 CC (Controcarro) выпускалась с 1938 по 1943 год. Всего было построено более 100 машин. Модификация L3 с 20-мм противотанковой пушкой Solothurn использовалась как ПТ-САУ."},
+{id:108,name:"P40",country:"italy",type:"heavy",wikipedia:"P40 tank",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Ansaldo_P40_01.jpg/1280px-Ansaldo_P40_01.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Тяжёлый танк (прототип)",engine:"SPA 242, 330 л.с.",speed:"40 км/ч",range:"280 км",crew:"4 человека",armament:"75 мм Cannone da 75/34",armorDetails:"20–60 мм",specs:{"Год":"1943","Масса":"30 т","Орудие":"75 мм","Произведено":"1"},history:"P40 — улучшенная версия P26/40 с 30-мм бронёй.",fullHistory:"P40 был создан в 1943 году в одном экземпляре. Улучшенная версия P26/40 с 30-мм бронёй не пошла в серию из-за капитуляции Италии."},
+{id:109,name:"CV-29",country:"italy",type:"light",wikipedia:"L3/33",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Carden-Loyd_Mk.VI_Str%C3%A4ngn%C3%A4s_12.08.11_%283a%29.JPG/1280px-Carden-Loyd_Mk.VI_Str%C3%A4ngn%C3%A4s_12.08.11_%283a%29.JPG?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ wtImage:"https://old-wiki.warthunder.ru/images/CV-29_Italy.jpg",
+ shortDesc:"Танкетка",engine:"Fiat, 43 л.с.",speed:"40 км/ч",range:"120 км",crew:"2 человека",armament:"6.5 мм пулемёт",armorDetails:"6–14 мм",specs:{"Годы":"1929","Масса":"3 т","Орудие":"пулемёт","Произведено":"21"},history:"CV-29 — первая итальянская танкетка на базе британской Carden-Loyd.",fullHistory:"CV-29 выпускалась в 1929 году. Всего было построено 21 машина. Первая итальянская танкетка на базе британской Carden-Loyd с пулемётом."},
+
+// ===================== JAPAN =====================
+{id:111,name:"Type 97 Chi-Ha",country:"japan",type:"medium",wikipedia:"Type 97 Chi-Ha",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Type_97_Chi-Ha_in_museums.jpg/1280px-Type_97_Chi-Ha_in_museums.jpg?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Основной средний танк",engine:"Mitsubishi SA12200VD, 170 л.с.",speed:"38 км/ч",range:"210 км",crew:"4 человека",armament:"57 мм Type 97",armorDetails:"6–25 мм",specs:{"Годы":"1937-1945","Масса":"15 т","Орудие":"57 мм","Броня":"6-25 мм","Произведено":"1200+"},history:"Type 97 Chi-Ha — основной японский средний танк Второй мировой.",fullHistory:"Type 97 Chi-Ha выпускался с 1937 по 1945 год. Всего было построено более 1200 машин. Основной японский средний танк Второй мировой с 57-мм орудием хорошо показал себя против пехоты, но уступал американским M4 Sherman в броне и огневой мощи."},
+{id:112,name:"Type 97 Shinhoto Chi-Ha",country:"japan",type:"medium",wikipedia:"Type 97 Chi-Ha",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Type-97-Shinhoto-ChiHa-Aberdeen.0003dtwq.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/Chi-Ha_Kai_Japan.jpg",
+ shortDesc:"Chi-Ha с новой башней",engine:"Mitsubishi SA12200VD, 170 л.с.",speed:"38 км/ч",range:"210 км",crew:"4 человека",armament:"47 мм Type 1",armorDetails:"6–25 мм",specs:{"Годы":"1941-1945","Масса":"15.5 т","Орудие":"47 мм","Броня":"6-25 мм","Произведено":"1000+"},history:"Type 97 Shinhoto Chi-Ha — модификация с новой башней и 47-мм орудием.",fullHistory:"Type 97 Shinhoto Chi-Ha выпускался с 1941 по 1945 год. Всего было построено более 1000 машин. Модификация с новой башней и 47-мм орудием Type 1 стала более эффективной против американских танков."},
+{id:113,name:"Type 95 Ha-Go",country:"japan",type:"light",wikipedia:"Type 95 Ha-Go",shortDesc:"Лёгкий танк",engine:"Mitsubishi NVD 6120, 120 л.с.",speed:"45 км/ч",range:"210 км",crew:"3 человека",armament:"37 мм Type 94",armorDetails:"6–12 мм",specs:{"Годы":"1935-1945","Масса":"7.4 т","Орудие":"37 мм","Броня":"6-12 мм","Произведено":"2300"},history:"Type 95 Ha-Go — японский лёгкий танк. Второй по массовости после Chi-Ha.",fullHistory:"Type 95 Ha-Go выпускался с 1935 по 1945 год. Всего было построено 2300 машин. Японский лёгкий танк с 37-мм орудием был вторым по массовости после Chi-Ha. Ha-Go активно использовался в Китае и на Тихоокеанском театре."},
+{id:114,name:"Type 1 Chi-He",country:"japan",type:"medium",wikipedia:"Type 1 Chi-He",shortDesc:"Улучшенный Chi-Ha",engine:"Mitsubishi Type 100, 240 л.с.",speed:"44 км/ч",range:"210 км",crew:"5 человек",armament:"47 мм Type 1",armorDetails:"12–50 мм",specs:{"Годы":"1942-1944","Масса":"17.2 т","Орудие":"47 мм","Броня":"12-50 мм","Произведено":"170"},history:"Type 1 Chi-He — улучшенная версия Chi-Ha с дизелем и сварным корпусом.",fullHistory:"Type 1 Chi-He выпускался с 1942 по 1944 год. Всего было построено 170 машин. Улучшенная версия Chi-Ha с дизелем и сварным корпусом получила 47-мм орудие и более толстую броню."},
+{id:115,name:"Type 2 Ho-I",country:"japan",type:"medium",wikipedia:"Type 2 Ho-I",shortDesc:"Танк поддержки",engine:"Mitsubishi Type 100, 240 л.с.",speed:"44 км/ч",range:"210 км",crew:"5 человек",armament:"75 мм Type 99",armorDetails:"12–50 мм",specs:{"Годы":"1942-1944","Масса":"16 т","Орудие":"75 мм","Броня":"12-50 мм","Произведено":"31"},history:"Type 2 Ho-I — японский танк поддержки пехоты с 75-мм гаубицей.",fullHistory:"Type 2 Ho-I выпускался с 1942 по 1944 год. Всего было построено 31 машина. Японский танк поддержки пехоты с 75-мм гаубицей Type 99 использовался для разрушения укреплений."},
+{id:116,name:"Type 3 Chi-Nu",country:"japan",type:"medium",wikipedia:"Type 3 Chi-Nu",
+ image:"https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Chi-Nu.JPG/1280px-Chi-Nu.JPG?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail",
+ shortDesc:"Последний серийный танк",engine:"Mitsubishi Type 100, 240 л.с.",speed:"39 км/ч",range:"210 км",crew:"5 человек",armament:"75 мм Type 3",armorDetails:"12–50 мм",specs:{"Годы":"1943-1945","Масса":"18.8 т","Орудие":"75 мм","Броня":"12-50 мм","Произведено":"166"},history:"Type 3 Chi-Nu — последний японский серийный танк войны.",fullHistory:"Type 3 Chi-Nu выпускался с 1943 по 1945 год. Всего было построено 166 машин. Последний японский серийный танк войны с 75-мм орудием Type 3 должен был бороться с M4 Sherman, но в боях не участвовал."},
+{id:117,name:"Type 4 Chi-To",country:"japan",type:"medium",wikipedia:"Type 4 Chi-To",shortDesc:"Средний танк",engine:"Mitsubishi Type 4, 400 л.с.",speed:"45 км/ч",range:"250 км",crew:"5 человек",armament:"75 мм Type 5",armorDetails:"12–75 мм",specs:{"Год":"1945","Масса":"30 т","Орудие":"75 мм","Произведено":"6"},history:"Type 4 Chi-To — японский средний танк для борьбы с Sherman.",fullHistory:"Type 4 Chi-To был создан в 1945 году в шести экземплярах. Японский средний танк с 75-мм орудием Type 5 для борьбы с Sherman не успел повоевать."},
+{id:118,name:"Type 5 Chi-Ri",country:"japan",type:"medium",wikipedia:"Type 5 Chi-Ri",shortDesc:"Прототип среднего танка",engine:"Mitsubishi Type 5, 800 л.с.",speed:"45 км/ч",range:"250 км",crew:"5 человек",armament:"75 мм Type 5 + 37 мм",armorDetails:"25–75 мм",specs:{"Год":"1945","Масса":"35 т","Орудие":"75 мм","Произведено":"1"},history:"Type 5 Chi-Ri — японский средний танк с дизелем и 75-мм орудием.",fullHistory:"Type 5 Chi-Ri был создан в 1945 году в одном экземпляре. Японский средний танк с дизелем и 75-мм орудием не успел повоевать."},
+{id:119,name:"Type 89 I-Go",country:"japan",type:"medium",wikipedia:"Type 89 I-Go",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Type_89_Yi-Go_at_Tsuchira.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/Type_89_I-Go_Japan.jpg",
+ shortDesc:"Средний танк 1930-х",engine:"Mitsubishi A6120VD, 120 л.с.",speed:"26 км/ч",range:"170 км",crew:"4 человека",armament:"57 мм Type 90",armorDetails:"6–17 мм",specs:{"Годы":"1929-1935","Масса":"12.8 т","Орудие":"57 мм","Броня":"6-17 мм","Произведено":"404"},history:"Type 89 I-Go — японский средний танк 1930-х. Устарел к началу Тихоокеанской войны.",fullHistory:"Type 89 I-Go выпускался с 1929 по 1935 год. Всего было построено 404 машины. Японский средний танк 1930-х с 57-мм орудием устарел к началу Тихоокеанской войны, но использовался в Китае."},
+{id:122,name:"Type 2 Ke-To",country:"japan",type:"light",wikipedia:"Type 2 Ke-To",shortDesc:"Лёгкий танк",engine:"Mitsubishi, 130 л.с.",speed:"50 км/ч",range:"200 км",crew:"3 человека",armament:"37 мм Type 1",armorDetails:"6–16 мм",specs:{"Годы":"1944-1945","Масса":"7.2 т","Орудие":"37 мм","Произведено":"34"},history:"Type 2 Ke-To — улучшенный Ha-Go с новой башней.",fullHistory:"Type 2 Ke-To выпускался с 1944 по 1945 год. Всего было построено 34 машины. Улучшенный Ha-Go с новой башней и 37-мм орудием Type 1."},
+{id:123,name:"Type 4 Ke-Nu",country:"japan",type:"light",wikipedia:"Type 4 Ke-Nu",shortDesc:"Лёгкий танк",engine:"Mitsubishi, 120 л.с.",speed:"45 км/ч",range:"210 км",crew:"3 человека",armament:"57 мм Type 97",armorDetails:"6–12 мм",specs:{"Год":"1944","Масса":"8.5 т","Орудие":"57 мм","Произведено":"100+"},history:"Type 4 Ke-Nu — модификация Type 95 с башней от Chi-Ha.",fullHistory:"Type 4 Ke-Nu выпускался в 1944 году. Всего было построено более 100 машин. Модификация Type 95 с башней от Chi-Ha и 57-мм орудием."},
+{id:125,name:"Type 1 Ho-Ni I",country:"japan",type:"medium",wikipedia:"Type 1 Ho-Ni I",shortDesc:"САУ",engine:"Mitsubishi Type 100, 240 л.с.",speed:"38 км/ч",range:"210 км",crew:"5 человек",armament:"75 мм Type 90",armorDetails:"12–50 мм",specs:{"Годы":"1941-1945","Масса":"15 т","Орудие":"75 мм","Произведено":"124"},history:"Type 1 Ho-Ni I — японская САУ на базе Chi-Ha.",fullHistory:"Type 1 Ho-Ni I выпускалась с 1941 по 1945 год. Всего было построено 124 машины. Японская САУ на базе Chi-Ha с 75-мм орудием Type 90 использовалась для поддержки пехоты."},
+{id:126,name:"Type 3 Ho-Ni III",country:"japan",type:"medium",wikipedia:"Type 3 Ho-Ni III",shortDesc:"ПТ-САУ",engine:"Mitsubishi Type 100, 240 л.с.",speed:"38 км/ч",range:"210 км",crew:"5 человек",armament:"75 мм Type 3",armorDetails:"12–50 мм",specs:{"Годы":"1944-1945","Масса":"18 т","Орудие":"75 мм","Произведено":"31"},history:"Type 3 Ho-Ni III — японская ПТ-САУ с 75-мм орудием.",fullHistory:"Type 3 Ho-Ni III выпускалась с 1944 по 1945 год. Всего было построено 31 машина. Японская ПТ-САУ с 75-мм орудием Type 3."},
+{id:127,name:"Type 4 Ho-Ro",country:"japan",type:"medium",wikipedia:"Type 4 Ho-Ro",shortDesc:"Самоходная гаубица",engine:"Mitsubishi Type 100, 240 л.с.",speed:"38 км/ч",range:"210 км",crew:"6 человек",armament:"150 мм Type 38",armorDetails:"12–25 мм",specs:{"Годы":"1944-1945","Масса":"15 т","Орудие":"150 мм гаубица","Произведено":"12"},history:"Type 4 Ho-Ro — японская самоходная 150-мм гаубица.",fullHistory:"Type 4 Ho-Ro выпускалась с 1944 по 1945 год. Всего было построено 12 машин. Японская самоходная 150-мм гаубица использовалась для разрушения укреплений."},
+{id:128,name:"O-I",country:"japan",type:"heavy",wikipedia:"O-I",
+ image:"https://upload.wikimedia.org/wikipedia/commons/5/50/IJA_interior_side_view_schematic_of_the_O-I_super_heavy_tank.png?utm_source=ru.wikipedia.org&utm_campaign=parser&utm_content=thumbnail_unscaled",
+ shortDesc:"Сверхтяжёлый танк",engine:"2 × Mitsubishi V12, 1200 л.с.",speed:"20 км/ч",range:"200 км",crew:"11 человек",armament:"105 мм + 37 мм + пулемёты",armorDetails:"до 150 мм",specs:{"Год":"1945","Масса":"120-150 т","Орудие":"105 мм","Произведено":"1"},history:"O-I — японский сверхтяжёлый танк. Четыре башни.",fullHistory:"O-I был создан в 1945 году в одном экземпляре. Японский сверхтяжёлый танк с четырьмя башнями и массой 120-150 тонн не пошёл в серию."},
+{id:129,name:"Type 92 Heavy Armored Car",country:"japan",type:"light",wikipedia:"Type 92 Heavy Armoured Car",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Type_92_Japanese_heavy_armored_car.jpg",
+ wtImage:"https://old-wiki.warthunder.ru/images/Type_92_Japan.jpg",
+ shortDesc:"Бронеавтомобиль",engine:"Franklin, 45 л.с.",speed:"40 км/ч",range:"200 км",crew:"3 человека",armament:"7.7 мм пулемёт",armorDetails:"6–12 мм",specs:{"Годы":"1932-1945","Масса":"2.8 т","Орудие":"пулемёт","Произведено":"167"},history:"Type 92 Heavy Armored Car — японский гусеничный бронеавтомобиль.",fullHistory:"Type 92 Heavy Armored Car выпускался с 1932 по 1945 год. Всего было построено 167 машин. Японский гусеничный бронеавтомобиль с пулемётом использовался для разведки."},
+
+// ===================== FINLAND =====================
+{id:131,name:"BT-42",country:"finland",type:"light",wikipedia:"BT-42",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/BT-42_Parola_2.jpg",
+ shortDesc:"Финская штурмовая САУ",engine:"М-17Т, 400 л.с.",speed:"52 км/ч",range:"375 км",crew:"3 человека",armament:"114 мм гаубица QF 4.5-inch",armorDetails:"6–20 мм",specs:{"Годы":"1943-1944","Масса":"15 т","Орудие":"114 мм гаубица","Броня":"6-20 мм","Произведено":"18"},history:"BT-42 — финская штурмовая САУ на шасси трофейного БТ-7 с британской 114-мм гаубицей. Использовалась в боях 1944 года, стала символом финской бронетанковой техники.",fullHistory:"BT-42 выпускалась с 1943 по 1944 год. Всего было построено 18 машин. Финская штурмовая САУ на шасси трофейного БТ-7 с британской 114-мм гаубицей QF 4.5-inch стала символом финской бронетанковой техники. BT-42 использовалась в боях 1944 года, но показала себя неудачно из-за слабой брони и низкой надёжности. Тем не менее, она осталась в истории как одна из самых узнаваемых финских бронемашин."},
+{id:132,name:"Vickers 6-Ton (T-26E)",country:"finland",type:"light",wikipedia:"Vickers 6-Ton",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Vickers_6_Ton_Mk_E_Parola_1.JPG",
+ shortDesc:"Британский танк на финской службе",engine:"Armstrong Siddeley, 80 л.с.",speed:"35 км/ч",range:"160 км",crew:"3 человека",armament:"37 мм Bofors / 47 мм",armorDetails:"5–17 мм",specs:{"Годы":"1938-1945","Масса":"8.5 т","Орудие":"37/47 мм","Броня":"5-17 мм","Произведено":"33"},history:"Vickers 6-Ton — британский экспортный танк, закупленный Финляндией в 1930-х годах. Прозван финнами «Viku».",fullHistory:"Vickers 6-Ton закупался Финляндией с 1938 по 1945 год. Всего было приобретено 33 машины. Британский экспортный танк с 37-мм орудием Bofors был прозван финнами «Viku». Vickers 6-Ton использовался в Зимней и Продолжительной войнах."},
+{id:133,name:"StuG III Ausf. G (Sturmi)",country:"finland",type:"medium",wikipedia:"Sturmgeschütz III",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/StuG_III_Ausf_G_Parola_1.JPG",
+ shortDesc:"Финская штурмовая САУ",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"40 км/ч",range:"155 км",crew:"4 человека",armament:"7.5 cm StuK 40 L/48",armorDetails:"30–80 мм",specs:{"Годы":"1944-1960-е","Масса":"23.9 т","Орудие":"75 мм","Броня":"30-80 мм","Произведено":"59"},history:"Финляндия получила 59 StuG III из Германии в 1944 году. Прозваны «Sturmi» и оставались на вооружении до 1960-х годов.",fullHistory:"Финляндия получила 59 StuG III Ausf. G из Германии в 1944 году. Прозванные «Sturmi», эти САУ стали самыми эффективными финскими бронемашинами в Продолжительной войне. Они оставались на вооружении Финляндии до 1960-х годов, а несколько машин сохранились в музеях."},
+{id:134,name:"T-26 (финский)",country:"finland",type:"light",wikipedia:"T-26",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/T-26_Parola_2.JPG",
+ shortDesc:"Трофейный советский танк",engine:"Т-26, 90 л.с.",speed:"30 км/ч",range:"180 км",crew:"3 человека",armament:"45 мм 20-К",armorDetails:"6–15 мм",specs:{"Годы":"1939-1945","Масса":"10.5 т","Орудие":"45 мм","Броня":"6-15 мм","Произведено":"~100+ (трофеи)"},history:"T-26 — множество танков были захвачены Финляндией в Зимней войне. Широко использовались финской армией.",fullHistory:"Финляндия захватила более 100 танков T-26 в Зимней войне 1939-1940 годов. Трофейные T-26 широко использовались финской армией в Продолжительной войне. Многие машины были модернизированы и оставались на вооружении до 1950-х годов."},
+{id:135,name:"Landsverk L-62 Anti II",country:"finland",type:"light",wikipedia:"Landsverk L-62 Anti II",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Landsverk_Anti_II_Parola_1.JPG",
+ shortDesc:"Зенитная САУ",engine:"Scania-Vabis 1664, 160 л.с.",speed:"40 км/ч",range:"200 км",crew:"4 человека",armament:"40 мм Bofors L/60",armorDetails:"6–20 мм",specs:{"Годы":"1942-1945","Масса":"10 т","Орудие":"40 мм зенитка","Броня":"6-20 мм","Произведено":"6"},history:"Landsverk L-62 Anti II — шведская зенитная САУ на финской службе. Использовалась как ПТ-САУ и для ПВО.",fullHistory:"Landsverk L-62 Anti II поставлялась Финляндии с 1942 по 1945 год. Всего было получено 6 машин. Шведская зенитная САУ с 40-мм орудием Bofors использовалась как ПТ-САУ и для ПВО."},
+{id:136,name:"T-28 (финский)",country:"finland",type:"medium",wikipedia:"T-28",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/T-28_Parola_1.JPG",
+ shortDesc:"Трофейный многобашенный танк",engine:"М-17Л, 500 л.с.",speed:"37 км/ч",range:"220 км",crew:"6 человек",armament:"76.2 мм КТ-28",armorDetails:"20–30 мм",specs:{"Годы":"1939-1945","Масса":"28 т","Орудие":"76.2 мм","Броня":"20-30 мм","Произведено":"2 (трофеи)"},history:"T-28 — советские многобашенные танки, захваченные Финляндией в Зимней войне. Использовались в финской армии до конца войны.",fullHistory:"Финляндия захватила 2 танка T-28 в Зимней войне. Эти многобашенные машины использовались финской армией до конца войны, в основном как учебные."},
+{id:137,name:"KV-1 (финский)",country:"finland",type:"heavy",wikipedia:"Kliment Voroshilov tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/KV-1_Parola_1.JPG",
+ shortDesc:"Трофейный тяжёлый танк",engine:"В-2К, 600 л.с.",speed:"34 км/ч",range:"225 км",crew:"5 человек",armament:"76.2 мм Ф-34",armorDetails:"30–90 мм",specs:{"Годы":"1942-1945","Масса":"45 т","Орудие":"76.2 мм","Броня":"30-90 мм","Произведено":"2 (трофеи)"},history:"KV-1 — захваченный финнами тяжёлый танк. Использовался как учебный и в боях до 1944 года.",fullHistory:"Финляндия захватила 2 танка KV-1 в 1942 году. Тяжёлые танки использовались как учебные и в боях до 1944 года. Один из них сохранился в музее Парола."},
+{id:138,name:"T-34-76 (финский)",country:"finland",type:"medium",wikipedia:"T-34",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/T-34-76_Parola_1.JPG",
+ shortDesc:"Трофейный средний танк",engine:"В-2-34, 500 л.с.",speed:"53 км/ч",range:"300 км",crew:"4 человека",armament:"76.2 мм Ф-34",armorDetails:"13–52 мм",specs:{"Годы":"1941-1945","Масса":"26.5 т","Орудие":"76.2 мм","Броня":"13-52 мм","Произведено":"~50 (трофеи)"},history:"T-34 — трофейные танки использовались финской армией под финским обозначением. Всего было захвачено около 50 машин.",fullHistory:"Финляндия захватила около 50 танков T-34 в 1941-1944 годах. Трофейные T-34 использовались финской армией под финским обозначением и оставались на вооружении до 1960-х годов."},
+{id:139,name:"Panzer IV Ausf. J (финский)",country:"finland",type:"medium",wikipedia:"Panzer IV",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/Panzer_IV_Ausf_J_Parola_1.JPG",
+ shortDesc:"Финский Panzer IV",engine:"Maybach HL 120 TRM, 300 л.с.",speed:"38 км/ч",range:"210 км",crew:"5 человек",armament:"7.5 cm KwK 40 L/48",armorDetails:"10–80 мм",specs:{"Год":"1944","Масса":"25 т","Орудие":"75 мм","Броня":"10-80 мм","Произведено":"15"},history:"Финляндия получила 15 Panzer IV Ausf. J из Германии в 1944 году. Прозваны «Panssari-IV».",fullHistory:"Финляндия получила 15 Panzer IV Ausf. J из Германии в 1944 году. Прозванные «Panssari-IV», эти танки использовались в Продолжительной войне и оставались на вооружении до 1960-х годов."},
+{id:140,name:"T-50 (финский)",country:"finland",type:"light",wikipedia:"T-50 tank",
+ image:"https://commons.wikimedia.org/wiki/Special:FilePath/T-50_Parola_1.JPG",
+ shortDesc:"Трофейный лёгкий танк",engine:"В-4, 300 л.с.",speed:"60 км/ч",range:"340 км",crew:"4 человека",armament:"45 мм 20-К",armorDetails:"12–37 мм",specs:{"Год":"1942","Масса":"14 т","Орудие":"45 мм","Броня":"12-37 мм","Произведено":"1 (трофей)"},history:"T-50 — единственный захваченный Финляндией экземпляр лёгкого танка T-50. Использовался как учебный до конца войны.",fullHistory:"Финляндия захватила один экземпляр лёгкого танка T-50 в 1942 году. Единственный трофейный T-50 использовался как учебный до конца войны и сохранился в музее Парола."}
+];
+
+/* =========================================================
+   КОНСТАНТЫ
+   ========================================================= */
+const COUNTRY_NAMES = { germany:'Германия', ussr:'СССР', usa:'США', uk:'Великобритания', france:'Франция', italy:'Италия', japan:'Япония', finland:'Финляндия' };
+const COUNTRY_COLORS = { germany:'#8a7a4a', ussr:'#4f512a', usa:'#6b8e23', uk:'#353b19', france:'#5a5e3a', italy:'#6b6b3a', japan:'#5a5a3a', finland:'#4a6fa5' };
+const TYPE_NAMES = { heavy:'Тяжёлый', medium:'Средний', light:'Лёгкий' };
+const NAV_COUNTRIES = ['all','germany','ussr','usa','uk','france','italy','japan','finland'];
+const TYPE_FILTERS = [
+    { id:'all', label:'Все типы' },
+    { id:'heavy', label:'Тяжёлые' },
+    { id:'medium', label:'Средние' },
+    { id:'light', label:'Лёгкие' }
+];
+
+/* =========================================================
+   УТИЛИТЫ
+   ========================================================= */
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function getCountryName(c) { return COUNTRY_NAMES[c] || c; }
+function getTypeName(t) { return TYPE_NAMES[t] || t; }
+function getCountryColor(c) { return COUNTRY_COLORS[c] || '#7f8c8d'; }
+function shade(hex, amt) {
+    let c = String(hex).replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    if (isNaN(num)) return hex;
+    let r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+    r = Math.max(0, Math.min(255, r + amt));
+    g = Math.max(0, Math.min(255, g + amt));
+    b = Math.max(0, Math.min(255, b + amt));
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+/* =========================================================
+   ЗАГРУЗКА ИЗОБРАЖЕНИЙ
+   Приоритет: image → en.wikipedia → Commons → wtImage → null
+   ========================================================= */
+const imageCache = new Map();
+
+async function fetchTankImage(tank) {
+    if (imageCache.has(tank.id)) return imageCache.get(tank.id);
+
+    if (tank.image) {
+        imageCache.set(tank.id, tank.image);
+        return tank.image;
+    }
+
+    const title = tank.wikipedia || tank.name;
+
+    try {
+        const api = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&format=json&pithumbsize=500&origin=*`;
+        const res = await fetch(api);
+        const data = await res.json();
+        const pages = data.query?.pages;
+        if (pages) {
+            const page = Object.values(pages)[0];
+            const src = page?.thumbnail?.source;
+            if (src) { imageCache.set(tank.id, src); return src; }
+        }
+    } catch (e) { /* ignore */ }
+
+    try {
+        const searchTitle = title.replace(/\s+/g, '_');
+        const commonsApi = `https://commons.wikimedia.org/w/api.php?action=query&generator=categorymembers&gcmtitle=Category:${encodeURIComponent(searchTitle)}&gcmtype=file&gcmlimit=5&prop=imageinfo&iiprop=url&format=json&origin=*`;
+        const cRes = await fetch(commonsApi);
+        const cData = await cRes.json();
+        const cPages = cData.query?.pages;
+        if (cPages) {
+            const first = Object.values(cPages)[0];
+            const url = first?.imageinfo?.[0]?.url;
+            if (url) { imageCache.set(tank.id, url); return url; }
+        }
+    } catch (e) { /* ignore */ }
+
+    if (tank.wtImage) {
+        imageCache.set(tank.id, tank.wtImage);
+        return tank.wtImage;
+    }
+
+    imageCache.set(tank.id, null);
+    return null;
+}
+
+function loadCardImage(card, tank, src) {
+    const img = card.querySelector('.tank-thumb');
+    if (!img || !src) return;
+    const probe = new Image();
+    probe.onload = () => {
+        img.src = src;
+        img.alt = `Фото: ${tank.name}`;
+        img.dataset.source = 'photo';
+    };
+    probe.onerror = () => { /* остаётся silhouette */ };
+    probe.src = src;
+}
+
+async function hydrateCardImages() {
+    const cards = document.querySelectorAll('.tank-card[data-tank-id]');
+    for (const card of cards) {
+        const id = Number(card.dataset.tankId);
+        const tank = tanksData.find(t => t.id === id);
+        if (!tank) continue;
+        const src = await fetchTankImage(tank);
+        if (src) loadCardImage(card, tank, src);
+    }
+}
+
+/* =========================================================
+   НАСТРОЙКИ
+   ========================================================= */
+const defaultSettings = { darkMode: false, cardMinWidth: 350, compact: false };
+function loadSettings() {
+    try {
+        const raw = localStorage.getItem('tankSettings');
+        if (!raw) return { ...defaultSettings };
+        return { ...defaultSettings, ...JSON.parse(raw) };
+    } catch (e) { return { ...defaultSettings }; }
+}
+let settings = loadSettings();
+let currentCountry = 'all';
+let currentType = 'all';
+
+function saveSettings() { try { localStorage.setItem('tankSettings', JSON.stringify(settings)); } catch (e) {} }
+function applySettings() {
+    document.body.classList.toggle('dark-mode', !!settings.darkMode);
+    const dm = document.getElementById('darkModeToggle'); if (dm) dm.checked = !!settings.darkMode;
+    const cs = document.getElementById('cardSizeRange'); if (cs) cs.value = settings.cardMinWidth;
+    const ct = document.getElementById('compactToggle'); if (ct) ct.checked = !!settings.compact;
+    document.body.style.setProperty('--card-min-width', settings.cardMinWidth + 'px');
+    document.body.style.setProperty('--grid-gap', settings.compact ? '1rem' : '2rem');
+}
+function toggleTheme() { settings.darkMode = document.getElementById('darkModeToggle').checked; applySettings(); saveSettings(); }
+function updateCardSize(val) { const v = Number(val); settings.cardMinWidth = isNaN(v) ? defaultSettings.cardMinWidth : v; document.body.style.setProperty('--card-min-width', settings.cardMinWidth + 'px'); saveSettings(); }
+function toggleCompact() { settings.compact = document.getElementById('compactToggle').checked; document.body.style.setProperty('--grid-gap', settings.compact ? '1rem' : '2rem'); saveSettings(); }
+function resetSettings() { settings = { ...defaultSettings }; applySettings(); saveSettings(); }
+function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+function closeSettings() { document.getElementById('settingsModal').style.display = 'none'; }
+
+/* =========================================================
+   РЕНДЕРИНГ
+   ========================================================= */
+function renderNav() {
+    const names = { all: 'Все', ...COUNTRY_NAMES };
+    document.getElementById('navList').innerHTML = NAV_COUNTRIES.map(c =>
+        `<li><a href="#" class="${currentCountry === c ? 'active' : ''}" onclick="filterByCountry('${c}'); return false;">${names[c]}</a></li>`
+    ).join('');
+}
+function renderFilters() {
+    document.getElementById('filterContainer').innerHTML = TYPE_FILTERS.map(t =>
+        `<button class="filter-btn ${currentType === t.id ? 'active' : ''}" onclick="filterByType('${t.id}')">${t.label}</button>`
+    ).join('');
+}
+
+function cardHTML(tank) {
+    const fallbackSvg = makeFallbackSilhouette(tank);
+    return `
+        <article class="tank-card" tabindex="0" role="button" data-tank-id="${tank.id}" aria-label="${escapeHTML(tank.name)}"
+                 onclick="openTank(${tank.id})"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTank(${tank.id});}">
+            <div class="tank-image-wrapper">
+                <img class="tank-thumb" src="${fallbackSvg}" alt="${escapeHTML(tank.name)}" loading="lazy">
+            </div>
+            <div class="tank-info">
+                <h3>${escapeHTML(tank.name)}</h3>
+                <div class="tags">
+                    <span class="tag" style="background:${getCountryColor(tank.country)}">${getCountryName(tank.country)}</span>
+                    <span class="tag" style="background:#9b59b6">${getTypeName(tank.type)}</span>
+                </div>
+            </div>
+        </article>`;
+}
+
+function renderTanks(tanks) {
+    const grid = document.getElementById('tanksGrid');
+    const counter = document.getElementById('resultsCount');
+    if (counter) counter.textContent = tanks.length ? `Найдено: ${tanks.length}` : '';
+    if (tanks.length === 0) {
+        grid.innerHTML = `<div class="empty-state"><div class="emoji">😔</div><p>Ничего не найдено</p><span>Попробуйте изменить фильтры или поисковый запрос</span><button class="filter-btn" onclick="resetFilters()">Сбросить фильтры</button></div>`;
+        return;
+    }
+    grid.innerHTML = tanks.map(cardHTML).join('');
+    hydrateCardImages();
+}
+
+/* =========================================================
+   ФИЛЬТРАЦИЯ
+   ========================================================= */
+function filterByCountry(country) { currentCountry = country; renderNav(); applyFilters(); }
+function filterByType(type) { currentType = type; renderFilters(); applyFilters(); }
+function handleSearch() { applyFilters(); }
+function resetFilters() {
+    currentCountry = 'all'; currentType = 'all';
+    const input = document.getElementById('searchInput'); if (input) input.value = '';
+    renderNav(); renderFilters(); applyFilters();
+}
+function applyFilters() {
+    const input = document.getElementById('searchInput');
+    const search = (input ? input.value : '').trim().toLowerCase();
+    const filtered = tanksData.filter(t => {
+        if (currentCountry !== 'all' && t.country !== currentCountry) return false;
+        if (currentType !== 'all' && t.type !== currentType) return false;
+        if (search) {
+            const hay = (t.name + ' ' + t.shortDesc + ' ' + t.history + ' ' + (t.fullHistory || '') + ' ' + Object.values(t.specs).join(' ')).toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+    renderTanks(filtered);
+}
+
+/* =========================================================
+   МОДАЛЬНОЕ ОКНО
+   ========================================================= */
+async function openTank(id) {
+    const tank = tanksData.find(t => t.id === id);
+    if (!tank) return;
+
+    const fallbackSvg = makeFallbackSilhouette(tank);
+
+    const detailHTML = `
+        <div class="detail-section">
+            <h4>Общая информация</h4>
+            <ul class="detail-list">
+                <li><span>Годы производства</span><span>${escapeHTML(tank.specs["Годы"] || tank.specs["Год"] || "—")}</span></li>
+                <li><span>Масса</span><span>${escapeHTML(tank.specs["Масса"] || "—")}</span></li>
+                <li><span>Экипаж</span><span>${escapeHTML(tank.crew || "—")}</span></li>
+                <li><span>Произведено</span><span>${escapeHTML(tank.specs["Произведено"] || "—")}</span></li>
+            </ul>
+        </div>
+        <div class="detail-section">
+            <h4>Вооружение и броня</h4>
+            <ul class="detail-list">
+                <li><span>Основное вооружение</span><span>${escapeHTML(tank.armament || tank.specs["Орудие"] || "—")}</span></li>
+                <li><span>Бронирование</span><span>${escapeHTML(tank.armorDetails || tank.specs["Броня"] || "—")}</span></li>
+            </ul>
+        </div>
+        <div class="detail-section">
+            <h4>Подвижность</h4>
+            <ul class="detail-list">
+                <li><span>Двигатель</span><span>${escapeHTML(tank.engine || "—")}</span></li>
+                <li><span>Максимальная скорость</span><span>${escapeHTML(tank.speed || "—")}</span></li>
+                <li><span>Запас хода</span><span>${escapeHTML(tank.range || "—")}</span></li>
+            </ul>
+        </div>
+    `;
+
+    const longHistoryHTML = tank.fullHistory
+        ? `<h3>Подробная история</h3>
+           <div class="long-history">
+               <p>${escapeHTML(tank.fullHistory)}</p>
+           </div>`
+        : '';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="modal-header">
+            <h2>${escapeHTML(tank.name)}</h2>
+            <p>${getCountryName(tank.country)} • ${getTypeName(tank.type)}</p>
+        </div>
+        <div class="modal-body">
+            <div class="modal-hero-wrap">
+                <img class="modal-hero" id="modalHeroImg" src="${fallbackSvg}" alt="${escapeHTML(tank.name)}">
+            </div>
+            <div class="image-credit" id="imageCredit"></div>
+            <h3>Краткая история</h3>
+            <p>${escapeHTML(tank.history)}</p>
+            ${longHistoryHTML}
+            ${detailHTML}
+            <h3>Характеристики (кратко)</h3>
+            <div class="specs-grid">
+                ${Object.entries(tank.specs).map(([k, v]) => `<div><strong>${escapeHTML(k)}:</strong> ${escapeHTML(v)}</div>`).join('')}
+            </div>
+        </div>`;
+
+    const modal = document.getElementById('tankModal');
+    modal.style.display = 'block';
+    modal.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    const closeBtn = modal.querySelector('.close-modal'); if (closeBtn) closeBtn.focus();
+
+    const src = await fetchTankImage(tank);
+    const heroImg = document.getElementById('modalHeroImg');
+    const credit = document.getElementById('imageCredit');
+    if (src && heroImg) {
+        const probe = new Image();
+        probe.onload = () => {
+            heroImg.src = src;
+            heroImg.alt = `Фото: ${tank.name}`;
+            if (credit) credit.textContent = 'Изображение: Wikimedia Commons / War Thunder / Tanks Encyclopedia';
+        };
+        probe.onerror = () => {
+            if (credit) credit.textContent = 'Изображение недоступно — показан схематичный силуэт';
+        };
+        probe.src = src;
+    } else if (credit) {
+        credit.textContent = 'Изображение недоступно — показан схематичный силуэт';
+    }
+}
+
+function closeModal() { document.getElementById('tankModal').style.display = 'none'; document.body.style.overflow = ''; }
+
+/* =========================================================
+   ЗАПАСНОЙ СИЛУЭТ
+   ========================================================= */
+function makeFallbackSilhouette(tank) {
+    const color = COUNTRY_COLORS[tank.country] || '#7f8c8d';
+    const light = shade(color, 40);
+    const dark = shade(color, -40);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" width="400" height="240">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#243341"/><stop offset="1" stop-color="#080b0f"/>
+        </linearGradient>
+        <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/>
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#bg)"/>
+      <ellipse cx="200" cy="214" rx="140" ry="6" fill="#000" opacity="0.5"/>
+      <rect x="60" y="170" width="280" height="34" rx="17" fill="#0f151c" stroke="#05080b" stroke-width="2"/>
+      <circle cx="95" cy="187" r="12" fill="#1e2732"/><circle cx="140" cy="187" r="12" fill="#1e2732"/>
+      <circle cx="185" cy="187" r="12" fill="#1e2732"/><circle cx="230" cy="187" r="12" fill="#1e2732"/>
+      <circle cx="275" cy="187" r="12" fill="#1e2732"/><circle cx="305" cy="187" r="12" fill="#1e2732"/>
+      <path d="M80,170 L100,130 L300,130 L320,170 Z" fill="url(#hull)" stroke="#05080b" stroke-width="2"/>
+      <rect x="150" y="102" width="110" height="28" rx="6" fill="url(#hull)" stroke="#05080b" stroke-width="2"/>
+      <rect x="255" y="112" width="120" height="8" rx="4" fill="#1a222b" stroke="#05080b" stroke-width="1.5"/>
+      <text x="200" y="40" text-anchor="middle" fill="${color}" font-family="sans-serif" font-size="13" opacity="0.8">${escapeHTML(tank.name)}</text>
+    </svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/* =========================================================
+   ИНИЦИАЛИЗАЦИЯ
+   ========================================================= */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeSettings(); } });
+function init() { applySettings(); renderNav(); renderFilters(); applyFilters(); }
+init();
+</script>
+</body>
+</html>
